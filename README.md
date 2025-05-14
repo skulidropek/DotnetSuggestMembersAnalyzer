@@ -1,122 +1,118 @@
-# ESLint Plugin: suggest-members
+# SuggestMembersAnalyzer
 
-An ESLint plugin that suggests potential corrections when accessing non-existent object members or using incorrect imports in TypeScript.
+A Roslyn analyzer that detects references to non-existent members, variables, and namespaces in C# code and suggests similar alternatives.
 
-## Features
+## Overview
 
-- 🔍 **Member Suggestion**: Suggests possible member names when accessing non-existent properties on objects
-- 📦 **Import Correction**: Suggests possible exports when using incorrect import names
-- 💡 **Smart Suggestions**: Uses multiple similarity algorithms including Jaro-Winkler to find the most relevant suggestions
-- 🛠️ **Automatic Fixes**: Offers automatic fixes for typos in member names and imports
+SuggestMembersAnalyzer helps developers catch typos and incorrect references early in the development process by leveraging the Roslyn compiler platform to identify and suggest corrections for non-existent code elements.
 
-## Installation
+## Diagnostics
 
-```bash
-npm install --save-dev @ton-ai-core/eslint-plugin-suggest-members
-# or
-yarn add --dev @ton-ai-core/eslint-plugin-suggest-members
+| ID      | Title                      | Category | Default Severity |
+|---------|----------------------------|----------|------------------|
+| SMB001  | Member does not exist      | Usage    | Error            |
+| SMB002  | Variable does not exist    | Usage    | Error            |
+| SMB003  | Namespace does not exist   | Usage    | Error            |
+
+## Analysis
+
+### SMB001: Member does not exist
+
+Reports when code attempts to access a member (property, method, field) that doesn't exist on the given type and suggests similar existing members.
+
+#### Example
+
+##### Non-compliant code
+
+```csharp
+// Error: 'count' does not exist on type 'List<int>'
+var count = items.count;
 ```
 
-This plugin requires:
-- ESLint v7.0.0+
-- TypeScript v4.0.0+
-- @typescript-eslint/parser v5.0.0+
+##### Diagnostic message
 
-## Usage
-
-### ESLint v9 (Flat Config)
-
-```js
-// eslint.config.js or eslint.config.mjs
-import js from "@eslint/js";
-import tsParser from "@typescript-eslint/parser";
-import tsPlugin from "@typescript-eslint/eslint-plugin";
-import * as path from 'path';
-import suggestMembersPlugin from "@ton-ai-core/eslint-plugin-suggest-members";
-
-export default [
-  js.configs.recommended,
-  {
-    files: ["**/*.ts"],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        project: ["./tsconfig.json"],
-        tsconfigRootDir: path.resolve(),
-        sourceType: "module"
-      }
-    },
-    plugins: {
-      "@typescript-eslint": tsPlugin,
-      "suggest-members": suggestMembersPlugin
-    },
-    rules: {
-      "suggest-members/suggest-members": "error",
-      "suggest-members/suggest-imports": "error"
-    }
-  }
-];
+```
+Member 'count' does not exist in type 'List<int>'. Did you mean:
+- Count: int
+- Count(): int 
+- Contains(object): bool
+- ConvertAll<TOutput>(Converter<T, TOutput>): List<TOutput>
+- Clear(): void
 ```
 
-### ESLint v8 and earlier (Traditional Config)
+### SMB002: Variable does not exist
 
-```js
-// .eslintrc.js
-module.exports = {
-  parser: '@typescript-eslint/parser',
-  parserOptions: {
-    ecmaVersion: 2020,
-    sourceType: 'module',
-    project: './tsconfig.json',
-  },
-  extends: [
-    'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-  ],
-  plugins: ['@typescript-eslint', 'suggest-members'],
-  rules: {
-    'suggest-members/suggest-members': 'error',
-    'suggest-members/suggest-imports': 'error'
-  }
-};
+Reports when code references a variable that doesn't exist in the current scope and suggests similarly named variables.
+
+#### Example
+
+##### Non-compliant code
+
+```csharp
+// Error: 'countr' is not declared in the current scope
+Console.WriteLine(countr);
 ```
 
-## Available Rules
+##### Diagnostic message
 
-### suggest-members/suggest-members
-
-Suggests similar property/method names when accessing non-existent members on an object.
-
-Example:
-```ts
-class User {
-  firstName: string;
-  lastName: string;
-  getFullName(): string {
-    return this.firstName + ' ' + this.lastName;
-  }
-}
-
-const user = new User();
-user.getFullNam(); // Error: Property "getFullNam" does not exist on type "User". Did you mean: "getFullName"?
+```
+Variable 'countr' does not exist in the current scope. Did you mean:
+- counter: int
+- count: int
+- content: string
+- Convert: Type
+- Console: Type
 ```
 
-### suggest-members/suggest-imports
+### SMB003: Namespace does not exist
 
-Suggests possible exports when trying to import a non-existent symbol from a module.
+Reports when code references a namespace that doesn't exist and suggests similarly named namespaces.
 
-Example:
-```ts
-import { readFil } from 'fs'; // Error: Import "readFil" is not defined in module "fs". Did you mean: "readFile"?
+#### Example
+
+##### Non-compliant code
+
+```csharp
+// Error: Namespace 'System.Texto' does not exist
+using System.Texto;
 ```
+
+##### Diagnostic message
+
+```
+Namespace 'System.Texto' does not exist. Did you mean:
+- System.Text
+- System.Text.Json
+- System.Text.RegularExpressions
+- System.Threading
+- System.Threading.Tasks
+```
+
+## Technical Implementation
+
+SuggestMembersAnalyzer employs several techniques to provide helpful suggestions:
+
+- **Semantic Model Analysis**: Uses Roslyn's semantic model to analyze code and determine if identifiers exist
+- **String Similarity**: Employs Jaro-Winkler algorithm and composite metrics to identify similar names
+- **Contextual Analysis**: Examines the current scope for available methods, properties, and types
+- **Suggestion Prioritization**: Ranks suggestions based on relevance, considering the type and context of use
+- **Detailed Formatting**: Presents suggestions in a user-friendly format with method signatures and types
 
 ## Configuration
 
-Both rules can be configured as:
-- `"error"` - Report errors (recommended for catching bugs)
-- `"warn"` - Report warnings
-- `"off"` - Disable the rule
+The analyzer's behavior can be controlled through EditorConfig settings.
 
-## License
+## Installation
 
-MIT
+Install the analyzer as a NuGet package:
+
+```
+dotnet add package SuggestMembersAnalyzer
+```
+
+After installation, the analyzer will be automatically enabled in your development environment (Visual Studio, Rider, VS Code) and will start suggesting corrections during development.
+
+## Requirements
+
+- .NET Standard 2.0 or higher
+- Compatible with Visual Studio 2019+ and other IDEs that support Roslyn analyzers 

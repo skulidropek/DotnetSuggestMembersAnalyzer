@@ -1,0 +1,18 @@
+# Apply rules only to C# files
+[*.cs]
+
+# Split long method calls into multiple lines
+csharp_wrap_method_invocation_arguments = true
+csharp_wrap_preserve_single_line = false
+csharp_wrap_chained_expression = true
+
+# Force new lines before '{'
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+
+# Require braces in if/else/while/for
+csharp_prefer_braces = true:error
+
+# Force method arguments to be split onto new lines
+csharp_new_line_before_comma = true
