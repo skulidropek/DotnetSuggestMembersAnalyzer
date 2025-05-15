@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -8,66 +11,35 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace SuggestMembersAnalyzer
 {
     /// <summary>
-    /// Roslyn analyzer that detects use of non-existent members and variables and suggests similar names.
+    /// Roslyn analyzer that detects use of non-existent members and suggests similar names.
     /// </summary>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public partial class SuggestMembersAnalyzer : DiagnosticAnalyzer
     {
         /// <summary>
-        /// Diagnostic ID for member not found errors
+        /// Diagnostic ID for member not found errors.
         /// </summary>
         public const string MemberNotFoundDiagnosticId = "SMB001";
 
-        /// <summary>
-        /// Diagnostic ID for variable not found errors
-        /// </summary>
-        public const string VariableNotFoundDiagnosticId = "SMB002";
-
-        /// <summary>
-        /// Diagnostic ID for namespace not found errors
-        /// </summary>
-        public const string NamespaceNotFoundDiagnosticId = "SMB003";
-
-        // Define the categories and message formats
         private static readonly LocalizableString MemberTitle = new LocalizableResourceString(
-            nameof(Resources.MemberNotFoundTitle), 
-            Resources.ResourceManager, 
+            nameof(Resources.MemberNotFoundTitle),
+            Resources.ResourceManager,
             typeof(Resources));
-
         private static readonly LocalizableString MemberDescription = new LocalizableResourceString(
-            nameof(Resources.MemberNotFoundDescription), 
-            Resources.ResourceManager, 
-            typeof(Resources));
-
-        private static readonly LocalizableString VariableTitle = new LocalizableResourceString(
-            nameof(Resources.VariableNotFoundTitle), 
-            Resources.ResourceManager, 
-            typeof(Resources));
-
-        private static readonly LocalizableString VariableDescription = new LocalizableResourceString(
-            nameof(Resources.VariableNotFoundDescription), 
-            Resources.ResourceManager, 
-            typeof(Resources));
-
-        private static readonly LocalizableString NamespaceTitle = new LocalizableResourceString(
-            nameof(Resources.NamespaceNotFoundTitle),
+            nameof(Resources.MemberNotFoundDescription),
             Resources.ResourceManager,
             typeof(Resources));
 
-        private static readonly LocalizableString NamespaceDescription = new LocalizableResourceString(
-            nameof(Resources.NamespaceNotFoundDescription),
-            Resources.ResourceManager,
-            typeof(Resources));
-
-        // Define category, help link, and release track for analyzer
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
         private const string Category = "Usage";
 
-        // Define diagnostics that this analyzer reports
         private static readonly DiagnosticDescriptor MemberNotFoundRule = new DiagnosticDescriptor(
             MemberNotFoundDiagnosticId,
             MemberTitle,
-            new LocalizableResourceString(nameof(Resources.MemberNotFoundMessageFormat), Resources.ResourceManager, typeof(Resources)),
+            new LocalizableResourceString(
+                nameof(Resources.MemberNotFoundMessageFormat),
+                Resources.ResourceManager,
+                typeof(Resources)),
             Category,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true,
@@ -75,73 +47,316 @@ namespace SuggestMembersAnalyzer
             helpLinkUri: HelpLinkUri,
             customTags: "AnalyzerReleaseTracking");
 
-        private static readonly DiagnosticDescriptor NamespaceNotFoundRule = new DiagnosticDescriptor(
-            NamespaceNotFoundDiagnosticId,
-            NamespaceTitle,
-            new LocalizableResourceString(nameof(Resources.NamespaceNotFoundMessageFormat), Resources.ResourceManager, typeof(Resources)),
-            Category,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true,
-            description: NamespaceDescription,
-            helpLinkUri: HelpLinkUri,
-            customTags: "AnalyzerReleaseTracking");
-
-        private static readonly DiagnosticDescriptor VariableNotFoundRule = new DiagnosticDescriptor(
-            VariableNotFoundDiagnosticId,
-            VariableTitle,
-            new LocalizableResourceString(nameof(Resources.VariableNotFoundMessageFormat), Resources.ResourceManager, typeof(Resources)),
-            Category,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true,
-            description: VariableDescription,
-            helpLinkUri: HelpLinkUri,
-            customTags: "AnalyzerReleaseTracking");
-
-        /// <summary>
-        /// The collection of diagnostic descriptors supported by this analyzer
-        /// </summary>
         private static readonly ImmutableArray<DiagnosticDescriptor> _supportedDiagnostics =
-            [MemberNotFoundRule, NamespaceNotFoundRule, VariableNotFoundRule];
+            ImmutableArray.Create(MemberNotFoundRule);
 
-        /// <summary>
-        /// Gets the set of supported diagnostics for this analyzer
-        /// </summary>
+        /// <inheritdoc/>
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
 
-        /// <summary>
-        /// Initializes the analyzer with the given analysis context
-        /// </summary>
-        /// <param name="context">Analysis context to register syntax node actions</param>
+        /// <inheritdoc/>
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
-            // Register for member access expressions (e.g. obj.Method())
-            context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
-            
-            // Register for identifiers that might be undefined variables
-            context.RegisterSyntaxNodeAction(AnalyzeIdentifier, SyntaxKind.IdentifierName);
-
-            // Register for using directives that might have misspelled namespaces
-            context.RegisterSyntaxNodeAction(AnalyzeUsingDirective, SyntaxKind.UsingDirective);
-
-            // Register for qualified names that might include class references
-            context.RegisterSyntaxNodeAction(AnalyzeClassReference, SyntaxKind.QualifiedName);
+            // handle both obj.Member and obj?.Member
+            context.RegisterSyntaxNodeAction(
+                AnalyzeMemberAccess,
+                SyntaxKind.SimpleMemberAccessExpression,
+                SyntaxKind.MemberBindingExpression);
         }
 
-        // Common utility methods used across different analysis types
-        private static ITypeSymbol? GetTypeFromSymbol(ISymbol symbol) => symbol switch
+        private static void AnalyzeMemberAccess(SyntaxNodeAnalysisContext context)
         {
-            ILocalSymbol local => local.Type,
-            IFieldSymbol field => field.Type,
-            IPropertySymbol property => property.Type,
-            IParameterSymbol parameter => parameter.Type,
-            IMethodSymbol method => method.ReturnType,
-            _ => null
-        };
+            ExpressionSyntax? targetExpression;
+            SimpleNameSyntax memberNameSyntax;
 
-        // Helper to format type names, handling generics properly
+            // 1) direct access: player.IsConnec1ted
+            if (context.Node is MemberAccessExpressionSyntax m)
+            {
+                if (m.Parent is AttributeSyntax)
+                {
+                    return;
+                }
+
+                targetExpression   = m.Expression;
+                memberNameSyntax   = m.Name;
+            }
+            // 2) conditional: player?.IsConnec1ted
+            else if (context.Node is MemberBindingExpressionSyntax b &&
+                     b.Parent is ConditionalAccessExpressionSyntax c)
+            {
+                targetExpression   = c.Expression;
+                memberNameSyntax   = b.Name;
+            }
+            else
+            {
+                return;
+            }
+
+            string memberName = memberNameSyntax.Identifier.Text;
+            var model        = context.SemanticModel;
+            var info         = model.GetSymbolInfo(memberNameSyntax);
+
+            if (info.Symbol != null
+                || info.CandidateReason == CandidateReason.OverloadResolutionFailure
+                || info.CandidateReason == CandidateReason.LateBound
+                || (info.CandidateSymbols.Length > 0 && info.CandidateSymbols.Any(s => s.Kind == SymbolKind.Method)))
+            {
+                return;
+            }
+
+            // determine the compile-time type of the target
+            var typeInfo   = model.GetTypeInfo(targetExpression);
+            ITypeSymbol? exprType = typeInfo.Type ?? typeInfo.ConvertedType;
+            if (exprType == null)
+            {
+                var exprSym = model.GetSymbolInfo(targetExpression).Symbol;
+                if (exprSym != null)
+                {
+                    exprType = exprSym switch
+                    {
+                        ILocalSymbol p     => p.Type,
+                        IFieldSymbol f     => f.Type,
+                        IPropertySymbol q  => q.Type,
+                        IParameterSymbol r => r.Type,
+                        IMethodSymbol ms   => ms.ReturnType,
+                        _                  => null
+                    };
+                }
+            }
+            if (exprType == null)
+            {
+                return;
+            }
+
+            // collect all members of the type, its bases and interfaces
+            var allMembers = new List<ISymbol>();
+            void CollectType(ITypeSymbol t)
+            {
+                allMembers.AddRange(t.GetMembers());
+                foreach (var iface in t.AllInterfaces)
+                {
+                    allMembers.AddRange(iface.GetMembers());
+                }
+
+                if (t.BaseType != null)
+                {
+                    CollectType(t.BaseType);
+                }
+            }
+            CollectType(exprType);
+
+            // filter out implicit, accessors, duplicates
+            var seen = new HashSet<string>();
+            var entries = new List<(string Key, ISymbol Value)>();
+            foreach (var sym in allMembers)
+            {
+                if (sym.IsImplicitlyDeclared
+                    || sym.Name.StartsWith("get_")
+                    || sym.Name.StartsWith("set_")
+                    || !seen.Add(sym.Name))
+                {
+                    continue;
+                }
+                entries.Add((sym.Name, sym));
+            }
+
+            // find up to 5 similar members
+            var similar = Utils.StringSimilarity
+                              .FindSimilarSymbols(memberName, entries)
+                              .Take(5)
+                              .ToList();
+
+            if (similar.Count == 0)
+            {
+                // fallback: lookup in current context symbols
+                var symbolList = model.LookupSymbols(memberNameSyntax.SpanStart)
+                                      .Select(s => (s.Name, s))
+                                      .ToList();
+                similar = Utils.StringSimilarity
+                              .FindSimilarSymbols(memberName, symbolList)
+                              .Take(5)
+                              .ToList();
+
+                if (similar.Count == 0)
+                {
+                    // fallback: all identifier tokens
+                    var identifierEntries = memberNameSyntax.SyntaxTree.GetRoot()
+                        .DescendantTokens()
+                        .Where(t => t.IsKind(SyntaxKind.IdentifierToken))
+                        .Select(t => t.ValueText)
+                        .Where(txt => !string.IsNullOrEmpty(txt))
+                        .Distinct()
+                        .Select(txt => (txt, (ISymbol)null!))
+                        .ToList();
+                    similar = Utils.StringSimilarity
+                                  .FindSimilarSymbols(memberName, identifierEntries)
+                                  .Take(5)
+                                  .ToList();
+                }
+            }
+
+            if (similar.Count == 0)
+            {
+                return;
+            }
+
+            // format suggestions
+            var suggestions = similar
+                .Select(r => r.Value != null
+                              ? GetFormattedMemberRepresentation(r.Value, includeSignature: true)
+                              : r.Name)
+                .ToList();
+            var names = similar.Select(r => r.Name).ToList();
+            var suggestionsText = "\n- " + string.Join("\n- ", suggestions);
+
+            var props = new Dictionary<string, string?> { ["Suggestions"] = string.Join("|", names) }
+                        .ToImmutableDictionary();
+
+            var diagnostic = Diagnostic.Create(
+                MemberNotFoundRule,
+                memberNameSyntax.GetLocation(),
+                props,
+                memberName,
+                exprType.Name,
+                suggestionsText);
+
+            context.ReportDiagnostic(diagnostic);
+        }
+
+        private static string GetMethodSignature(IMethodSymbol method)
+        {
+            try
+            {
+                if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
+                {
+                    string prop = method.Name.Substring(4);
+                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    return psym != null
+                        ? GetPropertySignature(psym)
+                        : $"{GetFormattedTypeName(method.ReturnType)} {prop} {{ get; }}";
+                }
+
+                if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_"))
+                {
+                    string prop = method.Name.Substring(4);
+                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    if (psym != null)
+                    {
+                        return GetPropertySignature(psym);
+                    }
+
+                    var ptype = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
+                    return $"{GetFormattedTypeName(ptype)} {prop} {{ set; }}";
+                }
+
+                var sb = new StringBuilder();
+                sb.Append(GetFormattedTypeName(method.ReturnType))
+                  .Append(' ')
+                  .Append(method.Name);
+
+                if (method.IsGenericMethod && method.TypeParameters.Length > 0)
+                {
+                    sb.Append('<')
+                      .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
+                      .Append('>');
+                }
+
+                sb.Append('(')
+                  .Append(string.Join(", ",
+                      method.Parameters.Select(p =>
+                      {
+                          var mod = p.RefKind switch
+                          {
+                              RefKind.Ref => "ref ",
+                              RefKind.Out => "out ",
+                              RefKind.In  => "in ",
+                              _           => ""
+                          };
+                          return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
+                      })))
+                  .Append(')');
+
+                return sb.ToString();
+            }
+            catch
+            {
+                return method.Name + "()";
+            }
+        }
+
+        private static string GetPropertySignature(IPropertySymbol property)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                if (property.IsStatic)
+                {
+                    sb.Append("static ");
+                }
+
+                if (property.IsAbstract)
+                {
+                    sb.Append("abstract ");
+                }
+
+                if (property.IsVirtual)
+                {
+                    sb.Append("virtual ");
+                }
+
+                if (property.IsOverride)
+                {
+                    sb.Append("override ");
+                }
+
+                sb.Append(GetFormattedTypeName(property.Type))
+                  .Append(' ')
+                  .Append(property.Name)
+                  .Append(" { ");
+                if (property.GetMethod != null)
+                {
+                    sb.Append("get; ");
+                }
+
+                if (property.SetMethod != null)
+                {
+                    sb.Append("set; ");
+                }
+
+                sb.Append('}');
+                return sb.ToString();
+            }
+            catch
+            {
+                return property.Name;
+            }
+        }
+
+        private static string GetFormattedMemberRepresentation(ISymbol member, bool includeSignature)
+        {
+            if (!includeSignature)
+            {
+                return member.Name;
+            }
+
+            try
+            {
+                return member switch
+                {
+                    IMethodSymbol   m => GetMethodSignature(m),
+                    IPropertySymbol p => GetPropertySignature(p),
+                    IFieldSymbol    f => $"{(f.IsStatic ? "static " : "")}{GetFormattedTypeName(f.Type)} {f.Name}",
+                    _                  => member.Name
+                };
+            }
+            catch
+            {
+                return member.Name;
+            }
+        }
+
         private static string GetFormattedTypeName(ITypeSymbol type)
         {
             if (type == null)
@@ -149,64 +364,12 @@ namespace SuggestMembersAnalyzer
                 return "object";
             }
 
-            // Use built-in formatting for all types
-            // Format: removes namespace, shows proper type name
-            var format = SymbolDisplayFormat.MinimallyQualifiedFormat
+            var fmt = SymbolDisplayFormat.MinimallyQualifiedFormat
                 .WithMemberOptions(SymbolDisplayMemberOptions.None)
                 .WithKindOptions(SymbolDisplayKindOptions.None)
                 .WithMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.UseSpecialTypes)
                 .WithGenericsOptions(SymbolDisplayGenericsOptions.IncludeTypeParameters);
-
-            return type.ToDisplayString(format);
-        }
-
-        // Helper method to format variable with its type
-        private static string FormatVariableWithType(string variableName, ITypeSymbol? type)
-        {
-            if (type == null)
-            {
-                return variableName;
-            }
-
-            return $"{GetFormattedTypeName(type)} {variableName}";
-        }
-
-        private static SyntaxNode? GetLocalScope(SyntaxNode node)
-        {
-            // Find the enclosing method or property declaration
-            var method = node.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
-            if (method != null)
-            {
-                return method;
-            }
-
-            var property = node.Ancestors().OfType<PropertyDeclarationSyntax>().FirstOrDefault();
-            if (property != null)
-            {
-                return property;
-            }
-
-            var constructor = node.Ancestors().OfType<ConstructorDeclarationSyntax>().FirstOrDefault();
-            if (constructor != null)
-            {
-                return constructor;
-            }
-
-            var accessor = node.Ancestors().OfType<AccessorDeclarationSyntax>().FirstOrDefault();
-            if (accessor != null)
-            {
-                return accessor;
-            }
-
-            // Fall back to the containing type
-            var type = node.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
-            if (type != null)
-            {
-                return type;
-            }
-
-            // If all else fails, return the compilation unit
-            return node.SyntaxTree.GetCompilationUnitRoot();
+            return type.ToDisplayString(fmt);
         }
     }
-} 
+}

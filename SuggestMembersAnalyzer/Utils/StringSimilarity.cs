@@ -3,30 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SuggestMembersAnalyzer.Utils
 {
-    /// <summary>
-    /// Represents a match between an input string and a possible correction
-    /// </summary>
-    /// <remarks>
-    /// Initializes a new instance of the SimilarityMatch class
-    /// </remarks>
-    /// <param name="name">The suggested name</param>
-    /// <param name="score">The similarity score</param>
-    public class SimilarityMatch(string name, double score)
-    {
-        /// <summary>
-        /// Gets the name of the suggested match
-        /// </summary>
-        public string Name { get; } = name;
-
-        /// <summary>
-        /// Gets the similarity score between the input and the suggestion
-        /// </summary>
-        public double Score { get; } = score;
-    }
-
     /// <summary>
     /// Provides methods to calculate string similarity for member name suggestions
     /// </summary>
@@ -146,8 +126,8 @@ namespace SuggestMembersAnalyzer.Utils
         public static string[] SplitIdentifier(string identifier)
         {
             return [.. Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
-                .Select(s => s.ToLowerInvariant())
-                .Where(s => !string.IsNullOrEmpty(s))];
+                .Select(static s => s.ToLowerInvariant())
+                .Where(static s => !string.IsNullOrEmpty(s))];
         }
 
         /// <summary>
@@ -232,7 +212,7 @@ namespace SuggestMembersAnalyzer.Utils
                     {
                         // For methods, add its signature
                         var parameters = methodSymbol.Parameters
-                            .Select(p => $"{p.Name}: {p.Type}")
+                            .Select(static p => $"{p.Name}: {p.Type}")
                             .ToList();
 
                         string paramString = string.Join(", ", parameters);
@@ -270,10 +250,10 @@ namespace SuggestMembersAnalyzer.Utils
 
             // Sort by similarity and take only top 5 items with scores above threshold
             return [.. result
-                .Where(item => item.score >= MinScore)
-                .OrderByDescending(item => item.score)
+                .Where(static item => item.score >= MinScore)
+                .OrderByDescending(static item => item.score)
                 .Take(5)
-                .Select(item => item.displayName)];
+                .Select(static item => item.displayName)];
         }
 
         /// <summary>
@@ -306,27 +286,51 @@ namespace SuggestMembersAnalyzer.Utils
                 return [];
             }
         }
+        
 
+        
         /// <summary>
-        /// Finds similar local symbols in the current scope
+        /// Finds similar symbols from a list of key-value tuples where keys are identifiers for search
+        /// and values are the full representations to insert. Allows duplicate keys.
         /// </summary>
-        public static List<(string name, double score)> FindSimilarLocalSymbols(
-            SemanticModel semanticModel,
-            SyntaxNode node,
-            string name)
+        /// <typeparam name="TValue">Type of value to return in results</typeparam>
+        /// <param name="queryName">The name being searched for</param>
+        /// <param name="candidateEntries">List of candidate entries with search key and display value</param>
+        /// <returns>List of matching items with scores</returns>
+        public static List<(string Name, TValue Value, double Score)> FindSimilarSymbols<TValue>(
+            string queryName,
+            IEnumerable<(string Key, TValue Value)> candidateEntries)
         {
-            const double MinScore = 0.3;
-
-            // Find symbols in the current scope
-            var symbols = semanticModel.LookupSymbols(node.SpanStart);
-
-            // Calculate similarity for each symbol, then remove duplicates, sort by score, and take top 5
-            return [.. symbols
-                .Select(symbol => (symbol.Name, ComputeCompositeScore(name, symbol.Name)))
-                .Where(item => item.Item2 >= MinScore)
-                .GroupBy(item => item.Name)
-                .Select(group => group.First())
-                .OrderByDescending(item => item.Item2)
+            const double MIN_SCORE = 0.3;
+            
+            // Process the provided candidate entries
+            return [.. candidateEntries
+                .Select(entry => (
+                    Name: entry.Key, 
+                    Value: entry.Value,
+                    Score: ComputeCompositeScore(queryName, entry.Key)))
+                .Where(item => !string.IsNullOrEmpty(item.Name) && 
+                       item.Score >= MIN_SCORE && 
+                       item.Name != queryName) // Exclude exact matches to the query, as these likely don't exist
+                .OrderByDescending(r => r.Score)
+                .Take(5)];
+        }
+     
+        /// <summary>
+        /// Finds similar names from a custom list of candidates (simple string array)
+        /// </summary>
+        public static List<(string Name, double Score)> FindSimilarLocalSymbols(
+            string queryName,
+            string[] candidateNames)
+        {
+            const double MIN_SCORE = 0.3;
+            
+            // Process the provided candidate names
+            return [.. candidateNames
+                .Where(candidate => !string.IsNullOrEmpty(candidate))
+                .Select(candidate => (Name: candidate, Score: ComputeCompositeScore(queryName, candidate)))
+                .Where(item => item.Score >= MIN_SCORE)
+                .OrderByDescending(r => r.Score)
                 .Take(5)];
         }
     }

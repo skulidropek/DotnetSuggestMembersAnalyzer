@@ -73,7 +73,7 @@
     <value>Variable not found</value>
   </data>
   <data name="VariableNotFoundMessageFormat" xml:space="preserve">
-    <value>Variable '{0}' does not exist, Did you mean: {1}</value>
+    <value>{0} '{1}' does not exist, Did you mean: {2}</value>
   </data>
   <data name="VariableNotFoundDescription" xml:space="preserve">
     <value>This variable does not exist in the current scope.</value>
