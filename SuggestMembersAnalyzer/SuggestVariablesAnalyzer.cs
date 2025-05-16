@@ -120,9 +120,31 @@ namespace SuggestMembersAnalyzer
                 return;
             }
 
-            // Filters: keywords, nameof, declarations, etc.
-            if (SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ||
-                name == "nameof" ||
+            // Comprehensive list of all C# keywords (both reserved and contextual)
+            var allKeywords = new[] {
+                // Reserved keywords
+                "abstract", "as", "base", "bool", "break", "byte", "case", "catch", 
+                "char", "checked", "class", "const", "continue", "decimal", "default", 
+                "delegate", "do", "double", "else", "enum", "event", "explicit", 
+                "extern", "false", "finally", "fixed", "float", "for", "foreach", 
+                "goto", "if", "implicit", "in", "int", "interface", "internal", "is", 
+                "lock", "long", "namespace", "new", "null", "object", "operator", 
+                "out", "override", "params", "private", "protected", "public", 
+                "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof", 
+                "stackalloc", "static", "string", "struct", "switch", "this", "throw", 
+                "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", 
+                "ushort", "using", "virtual", "void", "volatile", "while",
+                
+                // Contextual keywords
+                "add", "alias", "and", "ascending", "async", "await", "by", "descending", 
+                "dynamic", "equals", "file", "from", "get", "global", "group", "init", 
+                "into", "join", "let", "managed", "nameof", "not", "on", "or", "orderby", 
+                "partial", "record", "remove", "required", "scoped", "select", "set", 
+                "unmanaged", "value", "var", "when", "where", "with", "yield"
+            };
+
+            // Filters: keywords, declarations, etc.
+            if (allKeywords.Contains(name) ||
                 id.Parent is VariableDeclaratorSyntax ||
                 id.Parent is ParameterSyntax ||
                 id.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
@@ -142,6 +164,19 @@ namespace SuggestMembersAnalyzer
             // If symbol is found or overload resolution failed, skip
             if (info.Symbol != null ||
                 info.CandidateReason == CandidateReason.OverloadResolutionFailure)
+            {
+                return;
+            }
+
+            // Check if this is a type in a variable declaration with 'var'
+            // e.g., "var x = new MyClass();" - here 'var' is the type
+            if (id.Parent is VariableDeclarationSyntax varDecl && varDecl.Type == id)
+            {
+                return;
+            }
+
+            // Additional check for identifiers in query expressions (LINQ)
+            if (id.Ancestors().Any(n => n is QueryExpressionSyntax || n is AnonymousObjectMemberDeclaratorSyntax))
             {
                 return;
             }
