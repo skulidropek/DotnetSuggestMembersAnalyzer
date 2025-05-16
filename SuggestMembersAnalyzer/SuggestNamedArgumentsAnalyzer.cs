@@ -68,7 +68,7 @@ namespace SuggestMembersAnalyzer
             var arg = (ArgumentSyntax)context.Node;
             if (arg.NameColon == null)
             {
-                return; // только именованные аргументы
+                return; // only named arguments
             }
 
             string providedName = arg.NameColon.Name.Identifier.Text;
@@ -77,7 +77,7 @@ namespace SuggestMembersAnalyzer
                 return;
             }
 
-            // собираем кандидатные перегрузки
+            // collect candidate overloads
             IReadOnlyList<IMethodSymbol> candidateMethods;
             string invokedName = "";
 
@@ -86,7 +86,7 @@ namespace SuggestMembersAnalyzer
             {
                 var info = context.SemanticModel.GetSymbolInfo(inv.Expression);
                 
-                // Упрощаем вложенный тернарий
+                // Simplify nested ternary
                 if (info.CandidateReason == CandidateReason.OverloadResolutionFailure)
                 {
                     candidateMethods = info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
@@ -105,7 +105,7 @@ namespace SuggestMembersAnalyzer
             {
                 var info = context.SemanticModel.GetSymbolInfo(oc);
                 
-                // Упрощаем вложенный тернарий
+                // Simplify nested ternary
                 if (info.CandidateReason == CandidateReason.OverloadResolutionFailure)
                 {
                     candidateMethods = info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
@@ -129,27 +129,27 @@ namespace SuggestMembersAnalyzer
                 return;
             }
 
-            // имя для сообщения
+            // name for the message
             invokedName = candidateMethods[0].MethodKind == MethodKind.Constructor
                 ? candidateMethods[0].ContainingType.Name
                 : candidateMethods[0].Name;
 
-            // объединяем все параметры из всех перегрузок
+            // combine all parameters from all overloads
             var allParams = candidateMethods
                 .SelectMany(m => m.Parameters.Select(p => p.Name))
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            // если среди них есть наш переданный — выходим
+            // if our provided name is among them — exit
             if (allParams.Contains(providedName, StringComparer.Ordinal))
             {
                 return;
             }
 
-            // строим список сигнатур для всех кандидатов
+            // build a list of signatures for all candidates
             var signatures = candidateMethods.Select(m =>
             {
-                // параметры
+                // parameters
                 string paramList = string.Join(", ",
                     m.Parameters.Select(p =>
                         $"{p.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)} {p.Name}"));
@@ -167,10 +167,10 @@ namespace SuggestMembersAnalyzer
                 }
             }).ToList();
 
-            // форматируем под "\n- Sig(...)"
+            // format as "\n- Sig(...)"
             string suggestionsText = "\n- " + string.Join("\n- ", signatures);
 
-            // создаём диагностику
+            // create diagnostic
             var diag = Diagnostic.Create(
                 Rule,
                 arg.NameColon.Name.GetLocation(),
