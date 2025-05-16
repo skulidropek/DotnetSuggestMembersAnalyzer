@@ -219,8 +219,8 @@ namespace SuggestMembersAnalyzer
             // find up to 5 similar
             var similar = Utils.StringSimilarity
                               .FindSimilarSymbols(memberName, entries)
-                              .Take(5)
-                              .ToList();
+                              ;
+                              
             if (similar.Count == 0)
             {
                 return;
