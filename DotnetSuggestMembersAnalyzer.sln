@@ -2,7 +2,7 @@
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DotnetSuggestMembersAnalyzer", "DotnetSuggestMembersAnalyzer", "{630C54D7-5CD7-410E-BB4D-C323F96AB15C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuggestMembersAnalyzer", "SuggestMembersAnalyzer\SuggestMembersAnalyzer.csproj", "{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,20 +13,12 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3A45757C-2C84-4ADC-A1F8-96323EB7FD89}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3A45757C-2C84-4ADC-A1F8-96323EB7FD89}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3A45757C-2C84-4ADC-A1F8-96323EB7FD89}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3A45757C-2C84-4ADC-A1F8-96323EB7FD89}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0524AE47-1BF8-4DD7-9C30-43977693F000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0524AE47-1BF8-4DD7-9C30-43977693F000}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0524AE47-1BF8-4DD7-9C30-43977693F000}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0524AE47-1BF8-4DD7-9C30-43977693F000}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2318101B-E980-4847-95FA-2686EE5350DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2318101B-E980-4847-95FA-2686EE5350DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2318101B-E980-4847-95FA-2686EE5350DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2318101B-E980-4847-95FA-2686EE5350DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{2318101B-E980-4847-95FA-2686EE5350DC} = {630C54D7-5CD7-410E-BB4D-C323F96AB15C}
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B29E6DE7-8B2D-4A8C-A4F6-1E9AA89F9D1C}
 	EndGlobalSection
 EndGlobal
