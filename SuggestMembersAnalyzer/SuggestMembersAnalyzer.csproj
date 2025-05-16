@@ -10,11 +10,22 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
+    
+    <!-- NuGet Package Metadata -->
+    <Version>1.0.0</Version>
     <PackageId>SuggestMembersAnalyzer</PackageId>
     <Authors>DotnetSuggestMembersAnalyzer</Authors>
     <Description>Roslyn analyzer that suggests possible members when referencing non-existent members</Description>
+    <PackageTags>analyzer;roslyn;dotnet;csharp;intellisense;diagnostic;suggestion;typo</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/skulidropek/DotnetSuggestMembersAnalyzer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/skulidropek/DotnetSuggestMembersAnalyzer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
+    <Copyright>Copyright © 2024</Copyright>
+    
     <NoPackageAnalysis>true</NoPackageAnalysis>
-
     <EnablePackageValidation>true</EnablePackageValidation>
     
     <!-- Configure rules for analyzer release tracking -->
@@ -51,6 +62,10 @@
   <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

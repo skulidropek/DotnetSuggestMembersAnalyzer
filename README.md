@@ -1,118 +1,83 @@
-# SuggestMembersAnalyzer
+# Dotnet Suggest Members Analyzer
 
-A Roslyn analyzer that detects references to non-existent members, variables, and namespaces in C# code and suggests similar alternatives.
+A Roslyn analyzer for C# that helps developers identify and correct common mistakes when referencing non-existent members, variables, named arguments, or namespaces by providing accurate and intelligent suggestions.
 
-## Overview
+---
 
-SuggestMembersAnalyzer helps developers catch typos and incorrect references early in the development process by leveraging the Roslyn compiler platform to identify and suggest corrections for non-existent code elements.
+## 📦 Installation
 
-## Diagnostics
+You can install the analyzer via NuGet Package Manager:
 
-| ID      | Title                      | Category | Default Severity |
-|---------|----------------------------|----------|------------------|
-| SMB001  | Member does not exist      | Usage    | Error            |
-| SMB002  | Variable does not exist    | Usage    | Error            |
-| SMB003  | Namespace does not exist   | Usage    | Error            |
-
-## Analysis
-
-### SMB001: Member does not exist
-
-Reports when code attempts to access a member (property, method, field) that doesn't exist on the given type and suggests similar existing members.
-
-#### Example
-
-##### Non-compliant code
-
-```csharp
-// Error: 'count' does not exist on type 'List<int>'
-var count = items.count;
-```
-
-##### Diagnostic message
-
-```
-Member 'count' does not exist in type 'List<int>'. Did you mean:
-- Count: int
-- Count(): int 
-- Contains(object): bool
-- ConvertAll<TOutput>(Converter<T, TOutput>): List<TOutput>
-- Clear(): void
-```
-
-### SMB002: Variable does not exist
-
-Reports when code references a variable that doesn't exist in the current scope and suggests similarly named variables.
-
-#### Example
-
-##### Non-compliant code
-
-```csharp
-// Error: 'countr' is not declared in the current scope
-Console.WriteLine(countr);
-```
-
-##### Diagnostic message
-
-```
-Variable 'countr' does not exist in the current scope. Did you mean:
-- counter: int
-- count: int
-- content: string
-- Convert: Type
-- Console: Type
-```
-
-### SMB003: Namespace does not exist
-
-Reports when code references a namespace that doesn't exist and suggests similarly named namespaces.
-
-#### Example
-
-##### Non-compliant code
-
-```csharp
-// Error: Namespace 'System.Texto' does not exist
-using System.Texto;
-```
-
-##### Diagnostic message
-
-```
-Namespace 'System.Texto' does not exist. Did you mean:
-- System.Text
-- System.Text.Json
-- System.Text.RegularExpressions
-- System.Threading
-- System.Threading.Tasks
-```
-
-## Technical Implementation
-
-SuggestMembersAnalyzer employs several techniques to provide helpful suggestions:
-
-- **Semantic Model Analysis**: Uses Roslyn's semantic model to analyze code and determine if identifiers exist
-- **String Similarity**: Employs Jaro-Winkler algorithm and composite metrics to identify similar names
-- **Contextual Analysis**: Examines the current scope for available methods, properties, and types
-- **Suggestion Prioritization**: Ranks suggestions based on relevance, considering the type and context of use
-- **Detailed Formatting**: Presents suggestions in a user-friendly format with method signatures and types
-
-## Configuration
-
-The analyzer's behavior can be controlled through EditorConfig settings.
-
-## Installation
-
-Install the analyzer as a NuGet package:
-
-```
+```sh
 dotnet add package SuggestMembersAnalyzer
 ```
 
-After installation, the analyzer will be automatically enabled in your development environment (Visual Studio, Rider, VS Code) and will start suggesting corrections during development.
+Or via Package Manager Console:
 
-## Requirements
+```powershell
+Install-Package SuggestMembersAnalyzer
+```
 
-- .NET Standard 2.0 or higher
-- Compatible with Visual Studio 2019+ and other IDEs that support Roslyn analyzers 
+---
+
+## 🚀 Features
+
+* **Suggest Members (SMB001)**
+  Detects and suggests correct member names when referencing non-existent members.
+
+* **Suggest Variables (SMB002)**
+  Suggests similar variable names when referencing undefined variables.
+
+* **Suggest Namespaces (SMB003)**
+  Recommends correct namespaces when using incorrect or non-existent namespace references.
+
+* **Suggest Named Arguments (SMB004)**
+  Detects misspelled named arguments and provides suggestions with complete signatures for methods and constructors.
+
+---
+
+## ⚙️ Usage
+
+Simply reference the analyzer in your project. The analyzer will automatically run in your IDE (Visual Studio, Rider, VS Code, etc.) and display intelligent suggestions as errors or warnings directly in the editor.
+
+Example:
+
+```csharp
+var myPanel = new CuiPanel {
+    CursorEnalbed = true // Analyzer detects typo and suggests: CursorEnabled
+};
+```
+
+Diagnostic Message:
+
+```
+Member 'CursorEnalbed' does not exist on type 'CuiPanel'. Did you mean:
+- CursorEnabled
+```
+
+---
+
+## 🚧 Customizing Analyzer Behavior
+
+You can control analyzer severity via ruleset or editorconfig file:
+
+```editorconfig
+dotnet_diagnostic.SMB001.severity = error
+dotnet_diagnostic.SMB002.severity = error
+dotnet_diagnostic.SMB003.severity = error
+dotnet_diagnostic.SMB004.severity = error
+```
+
+---
+
+## 🔗 Contributing
+
+Feel free to contribute by creating issues or sending pull requests.
+
+Repository: [GitHub/skulidropek/DotnetSuggestMembersAnalyzer](https://github.com/skulidropek/DotnetSuggestMembersAnalyzer)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
