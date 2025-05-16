@@ -88,4 +88,14 @@
   <data name="NamespaceNotFoundDescription" xml:space="preserve">
     <value>This namespace does not exist.</value>
   </data>
+
+  <data name="NamedArgumentNotFoundTitle" xml:space="preserve">
+    <value>Named argument not found</value>
+  </data>
+  <data name="NamedArgumentNotFoundMessageFormat" xml:space="preserve">
+    <value>Parameter '{1}' does not exist for {0} '{2}', Available signatures: {3}</value>
+  </data>
+  <data name="NamedArgumentNotFoundDescription" xml:space="preserve">
+    <value>This named argument does not exist for the method or constructor.</value>
+  </data>
 </root> 

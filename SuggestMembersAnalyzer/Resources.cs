@@ -61,6 +61,21 @@ namespace SuggestMembersAnalyzer
         /// </summary>
         internal static string NamespaceNotFoundDescription => GetString("NamespaceNotFoundDescription");
 
+        /// <summary>
+        /// The title for the named argument not found diagnostic
+        /// </summary>
+        internal static string NamedArgumentNotFoundTitle => GetString("NamedArgumentNotFoundTitle");
+
+        /// <summary>
+        /// The message format for the named argument not found diagnostic
+        /// </summary>
+        internal static string NamedArgumentNotFoundMessageFormat => GetString("NamedArgumentNotFoundMessageFormat");
+
+        /// <summary>
+        /// The description for the named argument not found diagnostic
+        /// </summary>
+        internal static string NamedArgumentNotFoundDescription => GetString("NamedArgumentNotFoundDescription");
+
         private static string GetString(string resourceName)
         {
             // For Roslyn analyzers, we shouldn't use the CurrentUICulture
@@ -102,6 +117,15 @@ namespace SuggestMembersAnalyzer
 
                 case "NamespaceNotFoundDescription":
                     return "This namespace does not exist.";
+
+                case "NamedArgumentNotFoundTitle":
+                    return "Named argument not found";
+
+                case "NamedArgumentNotFoundMessageFormat":
+                    return "Parameter '{1}' does not exist for {0} '{2}', Available signatures: {3}";
+
+                case "NamedArgumentNotFoundDescription":
+                    return "This named argument does not exist for the method or constructor.";
 
                 default:
                     return resourceName;

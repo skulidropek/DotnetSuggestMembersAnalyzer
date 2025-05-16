@@ -23,15 +23,15 @@ namespace SuggestMembersAnalyzer
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
         private static readonly LocalizableString Title = new LocalizableResourceString(
-            nameof(Resources.MemberNotFoundTitle),
+            nameof(Resources.NamedArgumentNotFoundTitle),
             Resources.ResourceManager,
             typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(
-            nameof(Resources.MemberNotFoundMessageFormat),
+            nameof(Resources.NamedArgumentNotFoundMessageFormat),
             Resources.ResourceManager,
             typeof(Resources));
         private static readonly LocalizableString Description = new LocalizableResourceString(
-            nameof(Resources.MemberNotFoundDescription),
+            nameof(Resources.NamedArgumentNotFoundDescription),
             Resources.ResourceManager,
             typeof(Resources));
 
@@ -80,6 +80,7 @@ namespace SuggestMembersAnalyzer
             // collect candidate overloads
             IReadOnlyList<IMethodSymbol> candidateMethods;
             string invokedName = "";
+            string memberType = "";
 
             // 1) invocation: foo(bar: 1)
             if (argumentList.Parent is InvocationExpressionSyntax inv)
@@ -99,6 +100,8 @@ namespace SuggestMembersAnalyzer
                 {
                     candidateMethods = Array.Empty<IMethodSymbol>();
                 }
+                
+                memberType = "Method";
             }
             // 2) object creation: new Ctor(name: "x")
             else if (argumentList.Parent is ObjectCreationExpressionSyntax oc)
@@ -118,6 +121,8 @@ namespace SuggestMembersAnalyzer
                 {
                     candidateMethods = Array.Empty<IMethodSymbol>();
                 }
+                
+                memberType = "Constructor";
             }
             else
             {
@@ -174,9 +179,10 @@ namespace SuggestMembersAnalyzer
             var diag = Diagnostic.Create(
                 Rule,
                 arg.NameColon.Name.GetLocation(),
-                invokedName,
-                providedName,
-                suggestionsText);
+                memberType,          // тип элемента (Method или Constructor)
+                providedName,        // имя параметра
+                invokedName,         // имя метода/конструктора
+                suggestionsText);    // доступные сигнатуры
 
             context.ReportDiagnostic(diag);
         }
