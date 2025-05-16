@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SuggestMembersAnalyzer.Utils;
 
 namespace SuggestMembersAnalyzer
 {
@@ -205,7 +206,7 @@ namespace SuggestMembersAnalyzer
             // format suggestions
             var suggestions = similar
                 .Select(r => r.Value != null
-                              ? GetFormattedMemberRepresentation(r.Value, includeSignature: true)
+                              ? SymbolFormatter.GetFormattedMemberRepresentation(r.Value, includeSignature: true)
                               : r.Name)
                 .ToList();
             var names = similar.Select(r => r.Name).ToList();
@@ -223,153 +224,6 @@ namespace SuggestMembersAnalyzer
                 suggestionsText);
 
             context.ReportDiagnostic(diagnostic);
-        }
-
-        private static string GetMethodSignature(IMethodSymbol method)
-        {
-            try
-            {
-                if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
-                {
-                    string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
-                    return psym != null
-                        ? GetPropertySignature(psym)
-                        : $"{GetFormattedTypeName(method.ReturnType)} {prop} {{ get; }}";
-                }
-
-                if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_"))
-                {
-                    string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
-                    if (psym != null)
-                    {
-                        return GetPropertySignature(psym);
-                    }
-
-                    var ptype = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
-                    return $"{GetFormattedTypeName(ptype)} {prop} {{ set; }}";
-                }
-
-                var sb = new StringBuilder();
-                sb.Append(GetFormattedTypeName(method.ReturnType))
-                  .Append(' ')
-                  .Append(method.Name);
-
-                if (method.IsGenericMethod && method.TypeParameters.Length > 0)
-                {
-                    sb.Append('<')
-                      .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
-                      .Append('>');
-                }
-
-                sb.Append('(')
-                  .Append(string.Join(", ",
-                      method.Parameters.Select(p =>
-                      {
-                          var mod = p.RefKind switch
-                          {
-                              RefKind.Ref => "ref ",
-                              RefKind.Out => "out ",
-                              RefKind.In  => "in ",
-                              _           => ""
-                          };
-                          return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
-                      })))
-                  .Append(')');
-
-                return sb.ToString();
-            }
-            catch
-            {
-                return method.Name + "()";
-            }
-        }
-
-        private static string GetPropertySignature(IPropertySymbol property)
-        {
-            try
-            {
-                var sb = new StringBuilder();
-                if (property.IsStatic)
-                {
-                    sb.Append("static ");
-                }
-
-                if (property.IsAbstract)
-                {
-                    sb.Append("abstract ");
-                }
-
-                if (property.IsVirtual)
-                {
-                    sb.Append("virtual ");
-                }
-
-                if (property.IsOverride)
-                {
-                    sb.Append("override ");
-                }
-
-                sb.Append(GetFormattedTypeName(property.Type))
-                  .Append(' ')
-                  .Append(property.Name)
-                  .Append(" { ");
-                if (property.GetMethod != null)
-                {
-                    sb.Append("get; ");
-                }
-
-                if (property.SetMethod != null)
-                {
-                    sb.Append("set; ");
-                }
-
-                sb.Append('}');
-                return sb.ToString();
-            }
-            catch
-            {
-                return property.Name;
-            }
-        }
-
-        private static string GetFormattedMemberRepresentation(ISymbol member, bool includeSignature)
-        {
-            if (!includeSignature)
-            {
-                return member.Name;
-            }
-
-            try
-            {
-                return member switch
-                {
-                    IMethodSymbol   m => GetMethodSignature(m),
-                    IPropertySymbol p => GetPropertySignature(p),
-                    IFieldSymbol    f => $"{(f.IsStatic ? "static " : "")}{GetFormattedTypeName(f.Type)} {f.Name}",
-                    _                  => member.Name
-                };
-            }
-            catch
-            {
-                return member.Name;
-            }
-        }
-
-        private static string GetFormattedTypeName(ITypeSymbol type)
-        {
-            if (type == null)
-            {
-                return "object";
-            }
-
-            var fmt = SymbolDisplayFormat.MinimallyQualifiedFormat
-                .WithMemberOptions(SymbolDisplayMemberOptions.None)
-                .WithKindOptions(SymbolDisplayKindOptions.None)
-                .WithMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.UseSpecialTypes)
-                .WithGenericsOptions(SymbolDisplayGenericsOptions.IncludeTypeParameters);
-            return type.ToDisplayString(fmt);
         }
     }
 }
