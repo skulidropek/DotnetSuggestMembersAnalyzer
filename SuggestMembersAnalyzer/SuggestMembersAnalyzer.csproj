@@ -23,7 +23,6 @@
     <RepositoryUrl>https://github.com/skulidropek/DotnetSuggestMembersAnalyzer</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReleaseNotes>Initial release</PackageReleaseNotes>
-    <Copyright>Copyright © 2024</Copyright>
     
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <EnablePackageValidation>true</EnablePackageValidation>
