@@ -71,6 +71,10 @@
     <EmbeddedResource Update="Resources.resx" LogicalName="SuggestMembersAnalyzer.Resources.resources" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
   <Target Name="GetNuSpecVersionOverride" Returns="$(NuSpecVersionOverride)">
     <PropertyGroup>
       <NuSpecVersionOverride>$(Version)</NuSpecVersionOverride>
