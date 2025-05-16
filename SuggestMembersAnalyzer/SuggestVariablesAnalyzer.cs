@@ -59,7 +59,7 @@ namespace SuggestMembersAnalyzer
             context.RegisterSyntaxNodeAction(AnalyzeIdentifier, SyntaxKind.IdentifierName);
         }
 
-        // Cache of all type full names
+        // Кэш всех имён типов в проекте
         private static ImmutableArray<string> _allTypeNames;
 
         private static ImmutableArray<string> GetAllTypeNames(Compilation compilation)
@@ -81,12 +81,14 @@ namespace SuggestMembersAnalyzer
                     builder.Add(full);
                     foreach (var nested in type.GetTypeMembers())
                     {
-                        string nestedFull = nested
+                        builder.Add(
+                            nested
                             .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                            .Replace("global::", "");
-                        builder.Add(nestedFull);
+                            .Replace("global::", "")
+                        );
                     }
                 }
+
                 foreach (var child in ns.GetNamespaceMembers())
                 {
                     CollectNamespace(child);
@@ -94,6 +96,7 @@ namespace SuggestMembersAnalyzer
             }
 
             CollectNamespace(compilation.GlobalNamespace);
+
             foreach (var reference in compilation.References)
             {
                 if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)
@@ -102,52 +105,30 @@ namespace SuggestMembersAnalyzer
                 }
             }
 
-            _allTypeNames = [.. builder.Distinct()];
+            _allTypeNames = builder.Distinct().ToImmutableArray();
             return _allTypeNames;
         }
 
         private static void AnalyzeIdentifier(SyntaxNodeAnalysisContext context)
         {
             var id = (IdentifierNameSyntax)context.Node;
-            string name = id.Identifier.ValueText;
+            var name = id.Identifier.ValueText;
 
-            // Filters
-            if (SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None)
+            // НЕ ТРИГГЕРИТЬ для именованных аргументов вида `foo(bar: 123)`
+            if (id.Parent is NameColonSyntax)
             {
                 return;
             }
 
-            if (name == "nameof")
-            {
-                return;
-            }
-
-            if (id.Parent is VariableDeclaratorSyntax)
-            {
-                return;
-            }
-
-            if (id.Parent is ParameterSyntax)
-            {
-                return;
-            }
-
-            if (id.Ancestors().OfType<UsingDirectiveSyntax>().Any())
-            {
-                return;
-            }
-
-            if (id.Parent is MemberAccessExpressionSyntax ma && ma.Name == id)
-            {
-                return;
-            }
-
-            if (id.Parent is MemberBindingExpressionSyntax)
-            {
-                return;
-            }
-
-            if (id.Ancestors()
+            // Фильтры: ключевые слова, nameof, декларации и т.п.
+            if (SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None ||
+                name == "nameof" ||
+                id.Parent is VariableDeclaratorSyntax ||
+                id.Parent is ParameterSyntax ||
+                id.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
+                (id.Parent is MemberAccessExpressionSyntax ma && ma.Name == id) ||
+                id.Parent is MemberBindingExpressionSyntax ||
+                id.Ancestors()
                   .OfType<InvocationExpressionSyntax>()
                   .Any(inv => inv.Expression is IdentifierNameSyntax invId &&
                               invId.Identifier.ValueText == "nameof"))
@@ -155,15 +136,17 @@ namespace SuggestMembersAnalyzer
                 return;
             }
 
-            // Symbol check
             var model = context.SemanticModel;
-            var info = model.GetSymbolInfo(id);
-            if (info.Symbol != null || info.CandidateReason == CandidateReason.OverloadResolutionFailure)
+            var info  = model.GetSymbolInfo(id);
+
+            // Если символ найден или перегрузка неудачна, пропускаем
+            if (info.Symbol != null ||
+                info.CandidateReason == CandidateReason.OverloadResolutionFailure)
             {
                 return;
             }
 
-            // Gather candidate symbols
+            // Собираем локальные символы
             var symbols = model.LookupSymbols(id.SpanStart)
                 .Where(s => s.Kind is SymbolKind.Local
                          or SymbolKind.Parameter
@@ -172,20 +155,17 @@ namespace SuggestMembersAnalyzer
                          or SymbolKind.Method)
                 .ToList();
 
-            // Add all type names
+            // + все типы
             var typeNames = GetAllTypeNames(context.Compilation);
 
-            // Prepare entries
             var symbolEntries = symbols.Select(s => (Key: s.Name, Value: (object)s));
-            var typeEntries = typeNames.Select(fn =>
+            var typeEntries   = typeNames.Select(fn =>
             {
-                string[] parts = fn.Split('.');
-                string shortName = parts[parts.Length - 1];
-                return (Key: shortName, Value: (object)fn);
+                var parts = fn.Split('.');
+                return (Key: parts[parts.Length - 1], Value: (object)fn);
             });
             var entries = symbolEntries.Concat(typeEntries).ToList();
 
-            // Find top-5 similar
             var similar = Utils.StringSimilarity
                 .FindSimilarSymbols(name, entries)
                 .Select(r => r.Value)
@@ -196,10 +176,10 @@ namespace SuggestMembersAnalyzer
                 return;
             }
 
-            // Determine entity kind based on first suggestion
-            string entityKind = SymbolFormatter.GetEntityKind(similar[0]);
+            // Определяем вид (Class, Local, Field, Property, Method)
+            var entityKind = similar[0] != null ? SymbolFormatter.GetEntityKind(similar[0]) : "Identifier";
 
-            // Format suggestions with labels
+            // Форматируем подсказки
             var formatted = similar.Select(v =>
             {
                 if (v is ISymbol sym)
@@ -207,11 +187,11 @@ namespace SuggestMembersAnalyzer
                     return SymbolFormatter.FormatSymbol(sym);
                 }
 
-                return "[Class] " + v.ToString();
+                return "[Class] " + v;
             }).ToList();
 
-            // Report diagnostic with kind, name, suggestions
-            string suggestionText = "\n- " + string.Join("\n- ", formatted);
+            var suggestionText = "\n- " + string.Join("\n- ", formatted);
+
             var diagnostic = Diagnostic.Create(
                 VariableNotFoundRule,
                 id.GetLocation(),

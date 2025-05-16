@@ -4,3 +4,4 @@
 ### New Rules
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
+SMB004 | Usage | Error | NamedArgumentAnalyzer

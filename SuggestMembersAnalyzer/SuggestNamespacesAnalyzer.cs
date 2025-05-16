@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SuggestMembersAnalyzer.Utils;
 
 namespace SuggestMembersAnalyzer
 {
@@ -36,7 +37,7 @@ namespace SuggestMembersAnalyzer
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            [NamespaceNotFoundRule];
+            ImmutableArray.Create(NamespaceNotFoundRule);
 
         /// <inheritdoc />
         public override void Initialize(AnalysisContext context)
@@ -100,7 +101,7 @@ namespace SuggestMembersAnalyzer
                 }
             }
 
-            _allNamespaces = [.. builder.Distinct()];
+            _allNamespaces = builder.Distinct().ToImmutableArray();
             return _allNamespaces;
         }
 
