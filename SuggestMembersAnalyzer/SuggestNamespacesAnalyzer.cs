@@ -37,7 +37,7 @@ namespace SuggestMembersAnalyzer
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            [NamespaceNotFoundRule];
+            ImmutableArray.Create(NamespaceNotFoundRule);
 
         /// <inheritdoc />
         public override void Initialize(AnalysisContext context)

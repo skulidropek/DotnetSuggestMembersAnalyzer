@@ -56,7 +56,7 @@ namespace SuggestMembersAnalyzer
         /// Gets the supported diagnostics.
         /// </summary>
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            [MemberNotFoundRule];
+            ImmutableArray.Create(MemberNotFoundRule);
 
         /// <summary>
         /// Initializes the analyzer.

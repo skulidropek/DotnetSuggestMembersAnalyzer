@@ -49,7 +49,7 @@ namespace SuggestMembersAnalyzer
 
         /// <inheritdoc/>
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            [VariableNotFoundRule];
+            ImmutableArray.Create(VariableNotFoundRule);
 
         /// <inheritdoc/>
         public override void Initialize(AnalysisContext context)
