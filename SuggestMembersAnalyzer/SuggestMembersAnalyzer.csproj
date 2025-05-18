@@ -50,10 +50,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-      <PackageReference Include="SuggestMembersAnalyzer" Version="1.0.3">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -83,6 +79,13 @@
     <PropertyGroup>
       <NuSpecVersionOverride>$(Version)</NuSpecVersionOverride>
     </PropertyGroup>
+  </Target>
+
+  <!-- Add self-analysis: project will analyze itself -->
+  <Target Name="AddSelfAsAnalyzer" BeforeTargets="CoreCompile" Condition="Exists('$(OutDir)$(AssemblyName).dll')">
+    <ItemGroup>
+      <Analyzer Include="$(OutDir)$(AssemblyName).dll" />
+    </ItemGroup>
   </Target>
 
 </Project> 

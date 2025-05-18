@@ -111,7 +111,7 @@ namespace SuggestMembersAnalyzer.Utils
         {
             try
             {
-                // 1) Property getters/setters — без изменений
+                // 1) Property getters/setters — unchanged
                 if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
                 {
                     string prop = method.Name.Substring(4);
@@ -140,22 +140,22 @@ namespace SuggestMembersAnalyzer.Utils
                     return $"{GetFormattedTypeName(ptype)} {prop} {{ set; }}";
                 }
 
-                // 2) Начинаем строить сигнатуру
+                // 2) Start building the signature
                 var sb = new StringBuilder();
 
-                // 2.1) Возвращаемый тип
+                // 2.1) Return type
                 sb.Append(GetFormattedTypeName(method.ReturnType))
                 .Append(' ');
 
-                // 2.2) Для extension-методов добавляем префикс "Namespace.Class."
+                // 2.2) For extension methods add prefix "Namespace.Class."
                 if (method.IsExtensionMethod || method.MethodKind == MethodKind.ReducedExtension)
                 {
-                    // ContainingType.ToDisplayString() даст "System.Linq.Enumerable" и т.п.
+                    // ContainingType.ToDisplayString() gives "System.Linq.Enumerable" etc.
                     var container = method.ContainingType.ToDisplayString();
                     sb.Append(container).Append('.');
                 }
 
-                // 2.3) Имя метода + generic-параметры
+                // 2.3) Method name + generic parameters
                 sb.Append(method.Name);
                 if (method.IsGenericMethod && method.TypeParameters.Length > 0)
                 {
@@ -164,7 +164,7 @@ namespace SuggestMembersAnalyzer.Utils
                     .Append('>');
                 }
 
-                // 2.4) Параметры
+                // 2.4) Parameters
                 sb.Append('(')
                 .Append(string.Join(", ", method.Parameters.Select(p =>
                 {

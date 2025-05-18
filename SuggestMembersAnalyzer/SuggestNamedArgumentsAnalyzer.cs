@@ -179,10 +179,10 @@ namespace SuggestMembersAnalyzer
             var diag = Diagnostic.Create(
                 Rule,
                 arg.NameColon.Name.GetLocation(),
-                memberType,          // тип элемента (Method или Constructor)
-                providedName,        // имя параметра
-                invokedName,         // имя метода/конструктора
-                suggestionsText);    // доступные сигнатуры
+                memberType,          // element type (Method or Constructor)
+                providedName,        // parameter name
+                invokedName,         // method/constructor name
+                suggestionsText);    // available signatures
 
             context.ReportDiagnostic(diag);
         }
