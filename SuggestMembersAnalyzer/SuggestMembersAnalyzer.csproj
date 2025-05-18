@@ -12,7 +12,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     
     <!-- NuGet Package Metadata -->
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <PackageId>SuggestMembersAnalyzer</PackageId>
     <Authors>DotnetSuggestMembersAnalyzer</Authors>
     <Description>Roslyn analyzer that suggests possible members when referencing non-existent members</Description>
