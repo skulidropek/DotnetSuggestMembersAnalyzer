@@ -104,16 +104,21 @@ namespace SuggestMembersAnalyzer.Utils
         }
 
         /// <summary>
-        /// Gets a formatted signature for a method
+        /// Gets a formatted signature for a method,
+        /// and for extension methods includes the namespace and containing static class.
         /// </summary>
         public static string GetMethodSignature(this IMethodSymbol method)
         {
             try
             {
+                // 1) Property getters/setters — без изменений
                 if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
                 {
                     string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    var psym = method.ContainingType
+                                    .GetMembers(prop)
+                                    .OfType<IPropertySymbol>()
+                                    .FirstOrDefault();
                     return psym != null
                         ? GetPropertySignature(psym)
                         : $"{GetFormattedTypeName(method.ReturnType)} {prop} {{ get; }}";
@@ -122,47 +127,63 @@ namespace SuggestMembersAnalyzer.Utils
                 if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_"))
                 {
                     string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    var psym = method.ContainingType
+                                    .GetMembers(prop)
+                                    .OfType<IPropertySymbol>()
+                                    .FirstOrDefault();
                     if (psym != null)
-                    {
-                        return GetPropertySignature(psym);
-                    }
+                            {
+                                return GetPropertySignature(psym);
+                            }
 
-                    var ptype = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
+                            var ptype = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
                     return $"{GetFormattedTypeName(ptype)} {prop} {{ set; }}";
                 }
 
+                // 2) Начинаем строить сигнатуру
                 var sb = new StringBuilder();
-                sb.Append(GetFormattedTypeName(method.ReturnType))
-                  .Append(' ')
-                  .Append(method.Name);
 
+                // 2.1) Возвращаемый тип
+                sb.Append(GetFormattedTypeName(method.ReturnType))
+                .Append(' ');
+
+                // 2.2) Для extension-методов добавляем префикс "Namespace.Class."
+                if (method.IsExtensionMethod || method.MethodKind == MethodKind.ReducedExtension)
+                {
+                    // ContainingType.ToDisplayString() даст "System.Linq.Enumerable" и т.п.
+                    var container = method.ContainingType.ToDisplayString();
+                    sb.Append(container).Append('.');
+                }
+
+                // 2.3) Имя метода + generic-параметры
+                sb.Append(method.Name);
                 if (method.IsGenericMethod && method.TypeParameters.Length > 0)
                 {
                     sb.Append('<')
-                      .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
-                      .Append('>');
+                    .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
+                    .Append('>');
                 }
 
+                // 2.4) Параметры
                 sb.Append('(')
-                  .Append(string.Join(", ",
-                      method.Parameters.Select(p =>
-                      {
-                          var mod = p.RefKind switch
-                          {
-                              RefKind.Ref => "ref ",
-                              RefKind.Out => "out ",
-                              RefKind.In  => "in ",
-                              _           => ""
-                          };
-                          return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
-                      })))
-                  .Append(')');
+                .Append(string.Join(", ", method.Parameters.Select(p =>
+                {
+                    var mod = p.RefKind switch
+                    {
+                        RefKind.Ref => "ref ",
+                        RefKind.Out => "out ",
+                        RefKind.In  => "in ",
+                        _           => ""
+                    };
+                    return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
+                })))
+                .Append(')');
 
                 return sb.ToString();
             }
             catch
             {
+                // fallback
                 return method.Name + "()";
             }
         }
