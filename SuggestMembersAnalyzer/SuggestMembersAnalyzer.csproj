@@ -33,6 +33,13 @@
     <NoWarn>S1075</NoWarn>
   </PropertyGroup>
 
+  <!-- Атрибут для доступа к internal классам из тестового проекта -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>SuggestMembersAnalyzer.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
    <ItemGroup>
     <PackageReference Include="Philips.CodeAnalysis.DuplicateCodeAnalyzer" Version="1.1.7">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

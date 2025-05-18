@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuggestMembersAnalyzer", "SuggestMembersAnalyzer\SuggestMembersAnalyzer.csproj", "{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuggestMembersAnalyzer.Tests", "SuggestMembersAnalyzer.Tests\SuggestMembersAnalyzer.Tests.csproj", "{C17D0447-F646-44DD-97F7-A7E1E207FADF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,6 +19,10 @@ Global
 		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B649B1DB-4AF6-4518-A457-F816B1D5D5CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C17D0447-F646-44DD-97F7-A7E1E207FADF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C17D0447-F646-44DD-97F7-A7E1E207FADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C17D0447-F646-44DD-97F7-A7E1E207FADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C17D0447-F646-44DD-97F7-A7E1E207FADF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B29E6DE7-8B2D-4A8C-A4F6-1E9AA89F9D1C}

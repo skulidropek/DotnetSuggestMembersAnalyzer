@@ -14,6 +14,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string GetEntityKind(object entry)
         {
+            if (entry == null)
+            {
+                return "Unknown";
+            }
+            
             return entry switch
             {
                 IMethodSymbol    => "Method",
@@ -31,6 +36,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string FormatType(ITypeSymbol t)
         {
+            if (t == null)
+            {
+                return "object";
+            }
+            
             return t.SpecialType switch
             {
                 SpecialType.System_Void    or
@@ -61,45 +71,57 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string FormatSymbol(ISymbol symbol)
         {
-            switch (symbol)
+            if (symbol == null)
             {
-                case IMethodSymbol m:
+                return "[Unknown]";
+            }
+            
+            try
+            {
+                switch (symbol)
                 {
-                    string ret = FormatType(m.ReturnType);
-                    string @params = string.Join(", ",
-                        m.Parameters.Select(p => $"{FormatType(p.Type)} {p.Name}"));
-                    string owner = m.ContainingType
-                                   .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                                   .Replace("global::", "");
-                    return $"[Method] {ret} {owner}.{m.Name}({@params})";
+                    case IMethodSymbol m:
+                    {
+                        string ret = FormatType(m.ReturnType);
+                        string @params = string.Join(", ",
+                            m.Parameters.Select(p => $"{FormatType(p.Type)} {p.Name}"));
+                        string owner = m.ContainingType
+                                       ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                       ?.Replace("global::", "") ?? "Unknown";
+                        return $"[Method] {ret} {owner}.{m.Name}({@params})";
+                    }
+                    case IPropertySymbol p:
+                    {
+                        string typ = FormatType(p.Type);
+                        string acc = p.SetMethod != null ? "{ get; set; }" : "{ get; }";
+                        string owner = p.ContainingType
+                                       ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                       ?.Replace("global::", "") ?? "Unknown";
+                        return $"[Property] {typ} {owner}.{p.Name} {acc}";
+                    }
+                    case IFieldSymbol f:
+                    {
+                        string typ = FormatType(f.Type);
+                        string owner = f.ContainingType
+                                       ?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                       ?.Replace("global::", "") ?? "Unknown";
+                        return $"[Field] {typ} {owner}.{f.Name}";
+                    }
+                    case ILocalSymbol l:
+                        return $"[Local] {FormatType(l.Type)} {l.Name}";
+                    case IParameterSymbol p:
+                        return $"[Parameter] {FormatType(p.Type)} {p.Name}";
+                    case INamedTypeSymbol t:
+                        return "[Class] " + t
+                            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                            .Replace("global::", "");
+                    default:
+                        return symbol.ToDisplayString();
                 }
-                case IPropertySymbol p:
-                {
-                    string typ = FormatType(p.Type);
-                    string acc = p.SetMethod != null ? "{ get; set; }" : "{ get; }";
-                    string owner = p.ContainingType
-                                   .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                                   .Replace("global::", "");
-                    return $"[Property] {typ} {owner}.{p.Name} {acc}";
-                }
-                case IFieldSymbol f:
-                {
-                    string typ = FormatType(f.Type);
-                    string owner = f.ContainingType
-                                   .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                                   .Replace("global::", "");
-                    return $"[Field] {typ} {owner}.{f.Name}";
-                }
-                case ILocalSymbol l:
-                    return $"[Local] {FormatType(l.Type)} {l.Name}";
-                case IParameterSymbol p:
-                    return $"[Parameter] {FormatType(p.Type)} {p.Name}";
-                case INamedTypeSymbol t:
-                    return "[Class] " + t
-                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                        .Replace("global::", "");
-                default:
-                    return symbol.ToDisplayString();
+            }
+            catch
+            {
+                return $"[{GetEntityKind(symbol)}] {symbol.Name}";
             }
         }
 
@@ -108,12 +130,17 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string GetMethodSignature(this IMethodSymbol method)
         {
+            if (method == null)
+            {
+                return "void Unknown()";
+            }
+            
             try
             {
                 if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
                 {
                     string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    var psym = method.ContainingType?.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
                     return psym != null
                         ? GetPropertySignature(psym)
                         : $"{GetFormattedTypeName(method.ReturnType)} {prop} {{ get; }}";
@@ -122,14 +149,14 @@ namespace SuggestMembersAnalyzer.Utils
                 if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_"))
                 {
                     string prop = method.Name.Substring(4);
-                    var psym = method.ContainingType.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
+                    var psym = method.ContainingType?.GetMembers(prop).OfType<IPropertySymbol>().FirstOrDefault();
                     if (psym != null)
                     {
                         return GetPropertySignature(psym);
                     }
 
                     var ptype = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
-                    return $"{GetFormattedTypeName(ptype)} {prop} {{ set; }}";
+                    return $"{GetFormattedTypeName(ptype!)} {prop} {{ set; }}";
                 }
 
                 var sb = new StringBuilder();
@@ -172,6 +199,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string GetPropertySignature(this IPropertySymbol property)
         {
+            if (property == null)
+            {
+                return "object Unknown { get; }";
+            }
+            
             try
             {
                 var sb = new StringBuilder();
@@ -223,6 +255,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string GetFormattedMemberRepresentation(this ISymbol member, bool includeSignature)
         {
+            if (member == null)
+            {
+                return "Unknown";
+            }
+            
             if (!includeSignature)
             {
                 return member.Name;

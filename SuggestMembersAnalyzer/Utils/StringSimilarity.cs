@@ -125,6 +125,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string[] SplitIdentifier(string identifier)
         {
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                return Array.Empty<string>();
+            }
+            
             return [.. Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
                 .Select(static s => s.ToLowerInvariant())
                 .Where(static s => !string.IsNullOrEmpty(s))];
@@ -135,6 +140,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static string Normalize(string str)
         {
+            if (string.IsNullOrEmpty(str))
+            {
+                return string.Empty;
+            }
+            
             return Regex.Replace(str.ToLowerInvariant(), @"[_\s]", "");
         }
 
@@ -143,6 +153,10 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         public static double ComputeCompositeScore(string unknown, string candidate)
         {
+            // Проверка на null, чтобы избежать NullReferenceException
+            unknown = unknown ?? string.Empty;
+            candidate = candidate ?? string.Empty;
+            
             string normQuery = Normalize(unknown);
             string normCandidate = Normalize(candidate);
 
@@ -303,8 +317,16 @@ namespace SuggestMembersAnalyzer.Utils
         {
             const double MIN_SCORE = 0.3;
             
+            // Проверка на null параметров
+            queryName = queryName ?? string.Empty;
+            if (candidateEntries == null)
+            {
+                return [];
+            }
+            
             // Process the provided candidate entries
             return [.. candidateEntries
+                .Where(entry => entry.Key != null) // Фильтруем null значения ключа
                 .Select(entry => (
                     Name: entry.Key, 
                     Value: entry.Value,
@@ -324,6 +346,13 @@ namespace SuggestMembersAnalyzer.Utils
             string[] candidateNames)
         {
             const double MIN_SCORE = 0.3;
+            
+            // Проверка на null параметров
+            queryName = queryName ?? string.Empty;
+            if (candidateNames == null)
+            {
+                return [];
+            }
             
             // Process the provided candidate names
             return [.. candidateNames

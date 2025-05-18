@@ -1,0 +1,16 @@
+{
+  "stryker-config": {
+    "reporters": [
+      "html",
+      "progress"
+    ],
+    "solution": "../DotnetSuggestMembersAnalyzer.sln",
+    "mutation-level": "Standard",
+    "concurrency": 4,
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    }
+  }
+} 
