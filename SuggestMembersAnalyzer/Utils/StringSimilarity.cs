@@ -123,11 +123,14 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Splits an identifier into lowercase tokens using camelCase, underscores, spaces, or digits
         /// </summary>
+        /// <param name="identifier">The identifier to split</param>
+        /// <returns>Array of lowercase tokens</returns>
         public static string[] SplitIdentifier(string identifier)
         {
-            return [.. Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
+            return Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
                 .Select(static s => s.ToLowerInvariant())
-                .Where(static s => !string.IsNullOrEmpty(s))];
+                .Where(static s => !string.IsNullOrEmpty(s))
+                .ToArray();
         }
 
         /// <summary>
@@ -249,11 +252,12 @@ namespace SuggestMembersAnalyzer.Utils
             }
 
             // Sort by similarity and take only top 5 items with scores above threshold
-            return [.. result
+            return result
                 .Where(static item => item.score >= MinScore)
                 .OrderByDescending(static item => item.score)
                 .Take(5)
-                .Select(static item => item.displayName)];
+                .Select(static item => item.displayName)
+                .ToList();
         }
 
         /// <summary>
@@ -265,7 +269,7 @@ namespace SuggestMembersAnalyzer.Utils
         {
             if (moduleSymbol == null)
             {
-                return [];
+                return new List<(string name, double score)>();
             }
 
             try
@@ -274,16 +278,17 @@ namespace SuggestMembersAnalyzer.Utils
                 const double MinScore = 0.3;
 
                 // Calculate similarity scores, filter by threshold, sort by score and return top 5
-                return [.. exports
+                return exports
                     .Select(exportSymbol => (exportSymbol.Name, ComputeCompositeScore(requestedName, exportSymbol.Name)))
                     .Where(item => item.Item2 > MinScore)
                     .OrderByDescending(item => item.Item2)
                     .Take(5)
-                    .Select(item => (item.Name, item.Item2))];
+                    .Select(item => (item.Name, item.Item2))
+                    .ToList();
             }
             catch
             {
-                return [];
+                return new List<(string name, double score)>();
             }
         }
         
@@ -304,7 +309,7 @@ namespace SuggestMembersAnalyzer.Utils
             const double MIN_SCORE = 0.3;
             
             // Process the provided candidate entries
-            return [.. candidateEntries
+            return candidateEntries
                 .Select(entry => (
                     Name: entry.Key, 
                     Value: entry.Value,
@@ -313,7 +318,8 @@ namespace SuggestMembersAnalyzer.Utils
                        item.Score >= MIN_SCORE && 
                        item.Name != queryName) // Exclude exact matches to the query, as these likely don't exist
                 .OrderByDescending(r => r.Score)
-                .Take(5)];
+                .Take(5)
+                .ToList();
         }
      
         /// <summary>
@@ -326,12 +332,13 @@ namespace SuggestMembersAnalyzer.Utils
             const double MIN_SCORE = 0.3;
             
             // Process the provided candidate names
-            return [.. candidateNames
+            return candidateNames
                 .Where(candidate => !string.IsNullOrEmpty(candidate))
                 .Select(candidate => (Name: candidate, Score: ComputeCompositeScore(queryName, candidate)))
                 .Where(item => item.Score >= MIN_SCORE)
                 .OrderByDescending(r => r.Score)
-                .Take(5)];
+                .Take(5)
+                .ToList();
         }
     }
 }

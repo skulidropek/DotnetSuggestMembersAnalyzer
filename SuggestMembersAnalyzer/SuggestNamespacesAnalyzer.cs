@@ -47,6 +47,10 @@ namespace SuggestMembersAnalyzer
             context.RegisterSyntaxNodeAction(AnalyzeUsingDirective, SyntaxKind.UsingDirective);
         }
 
+        /// <summary>
+        /// Analyzes a using directive to check if the namespace exists and suggest alternatives if it doesn't.
+        /// </summary>
+        /// <param name="context">The syntax node analysis context</param>
         private static void AnalyzeUsingDirective(SyntaxNodeAnalysisContext context)
         {
             var usingDirective = (UsingDirectiveSyntax)context.Node;
@@ -83,6 +87,12 @@ namespace SuggestMembersAnalyzer
         // Cache of all namespaces
         private static ImmutableArray<string> _allNamespaces;
 
+        /// <summary>
+        /// Gets all available namespaces from the compilation and its referenced assemblies.
+        /// Uses a static cache to avoid repeated collection.
+        /// </summary>
+        /// <param name="compilation">The compilation containing the namespaces</param>
+        /// <returns>An immutable array of namespace names</returns>
         private static ImmutableArray<string> GetAllNamespaces(Compilation compilation)
         {
             if (!_allNamespaces.IsDefaultOrEmpty)
@@ -105,6 +115,11 @@ namespace SuggestMembersAnalyzer
             return _allNamespaces;
         }
 
+        /// <summary>
+        /// Recursively collects namespace names from a namespace symbol hierarchy.
+        /// </summary>
+        /// <param name="ns">The namespace symbol to start collection from</param>
+        /// <param name="builder">The builder to add namespace names to</param>
         private static void CollectNamespaces(INamespaceSymbol ns, ImmutableArray<string>.Builder builder)
         {
             var name = ns.ToDisplayString();
@@ -119,6 +134,12 @@ namespace SuggestMembersAnalyzer
             }
         }
 
+        /// <summary>
+        /// Finds namespaces with names similar to the requested namespace name.
+        /// </summary>
+        /// <param name="compilation">The compilation containing potential namespace matches</param>
+        /// <param name="namespaceName">The namespace name to find alternatives for</param>
+        /// <returns>A collection of similar namespace names</returns>
         private static IEnumerable<string> GetSimilarNamespaces(Compilation compilation, string namespaceName)
         {
             var allNs = GetAllNamespaces(compilation);

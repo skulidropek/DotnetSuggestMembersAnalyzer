@@ -1,3 +1,4 @@
+// File: SuggestMembersAnalyzer/SuggestVariablesAnalyzer.cs
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -10,7 +11,8 @@ using SuggestMembersAnalyzer.Utils;
 namespace SuggestMembersAnalyzer
 {
     /// <summary>
-    /// SuggestVariablesAnalyzer.
+    /// Analyzer that suggests possible local variables, fields, properties, or types
+    /// when referencing non-existent identifiers.
     /// </summary>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
@@ -19,139 +21,137 @@ namespace SuggestMembersAnalyzer
         /// Diagnostic ID for variable not found errors.
         /// </summary>
         public const string VariableNotFoundDiagnosticId = "SMB002";
-
         private const string Category = "Usage";
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
-        private static readonly LocalizableString VariableTitle = new LocalizableResourceString(
+        private static readonly LocalizableString Title = new LocalizableResourceString(
             nameof(Resources.VariableNotFoundTitle),
             Resources.ResourceManager,
             typeof(Resources));
-
-        private static readonly LocalizableString VariableDescription = new LocalizableResourceString(
+        private static readonly LocalizableString MessageFormat = new LocalizableResourceString(
+            nameof(Resources.VariableNotFoundMessageFormat),
+            Resources.ResourceManager,
+            typeof(Resources));
+        private static readonly LocalizableString Description = new LocalizableResourceString(
             nameof(Resources.VariableNotFoundDescription),
             Resources.ResourceManager,
             typeof(Resources));
 
-        private static readonly DiagnosticDescriptor VariableNotFoundRule = new DiagnosticDescriptor(
+        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
             VariableNotFoundDiagnosticId,
-            VariableTitle,
-            new LocalizableResourceString(
-                nameof(Resources.VariableNotFoundMessageFormat),
-                Resources.ResourceManager,
-                typeof(Resources)),
+            Title,
+            MessageFormat,
             Category,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true,
-            description: VariableDescription,
-            helpLinkUri: HelpLinkUri,
-            customTags: "AnalyzerReleaseTracking");
+            description: Description,
+            helpLinkUri: HelpLinkUri);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the supported diagnostics.
+        /// </summary>
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-            ImmutableArray.Create(VariableNotFoundRule);
+            ImmutableArray.Create(Rule);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Initializes the analyzer.
+        /// </summary>
+        /// <param name="context">The analysis context.</param>
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(AnalyzeIdentifier, SyntaxKind.IdentifierName);
+
+            context.RegisterCompilationStartAction(compilationContext =>
+            {
+                var compilation = compilationContext.Compilation;
+                
+                // Initialize SymbolFormatter with the current compilation
+                SymbolFormatter.Initialize(compilation);
+                
+                var allTypeNames = CollectAllTypeNames(compilation);
+
+                compilationContext.RegisterSyntaxNodeAction(
+                    ctx => AnalyzeIdentifier(ctx, allTypeNames),
+                    SyntaxKind.IdentifierName);
+            });
         }
 
-        // Cache of all type names in the project
-        private static ImmutableArray<string> _allTypeNames;
-
-        private static ImmutableArray<string> GetAllTypeNames(Compilation compilation)
+        /// <summary>
+        /// Collects all type names from the compilation and its referenced assemblies.
+        /// </summary>
+        /// <param name="compilation">The compilation containing the types</param>
+        /// <returns>An immutable array of fully qualified type names</returns>
+        private static ImmutableArray<string> CollectAllTypeNames(Compilation compilation)
         {
-            if (!_allTypeNames.IsDefaultOrEmpty)
-            {
-                return _allTypeNames;
-            }
-
             var builder = ImmutableArray.CreateBuilder<string>();
 
-            void CollectNamespace(INamespaceSymbol ns)
+            // Local function to recursively walk namespace hierarchies
+            void WalkNamespace(INamespaceSymbol ns)
             {
                 foreach (var type in ns.GetTypeMembers())
                 {
-                    string full = type
-                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                        .Replace("global::", "");
+                    var full = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                   .Replace("global::", "");
                     builder.Add(full);
                     foreach (var nested in type.GetTypeMembers())
                     {
                         builder.Add(
-                            nested
-                            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                            .Replace("global::", "")
-                        );
+                            nested.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                  .Replace("global::", ""));
                     }
                 }
 
                 foreach (var child in ns.GetNamespaceMembers())
                 {
-                    CollectNamespace(child);
+                    WalkNamespace(child);
                 }
             }
 
-            CollectNamespace(compilation.GlobalNamespace);
+            WalkNamespace(compilation.GlobalNamespace);
 
             foreach (var reference in compilation.References)
             {
                 if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)
                 {
-                    CollectNamespace(asm.GlobalNamespace);
+                    WalkNamespace(asm.GlobalNamespace);
                 }
             }
 
-            _allTypeNames = builder.Distinct().ToImmutableArray();
-            return _allTypeNames;
+            return builder.Distinct().ToImmutableArray();
         }
 
-        private static void AnalyzeIdentifier(SyntaxNodeAnalysisContext context)
+        /// <summary>
+        /// Analyzes an identifier node to detect undefined variables and suggest alternatives.
+        /// </summary>
+        /// <param name="context">The syntax node analysis context</param>
+        /// <param name="allTypeNames">Collection of all available type names for suggestions</param>
+        private static void AnalyzeIdentifier(
+            SyntaxNodeAnalysisContext context,
+            ImmutableArray<string> allTypeNames)
         {
             var id = (IdentifierNameSyntax)context.Node;
             var name = id.Identifier.ValueText;
 
-            // DO NOT TRIGGER for named arguments like `foo(bar: 123)`
-            if (id.Parent is NameColonSyntax)
-            {
-                return;
-            }
-
-            // Comprehensive list of all C# keywords (both reserved and contextual)
-            var allKeywords = new[] {
-                // Reserved keywords
-                "abstract", "as", "base", "bool", "break", "byte", "case", "catch", 
-                "char", "checked", "class", "const", "continue", "decimal", "default", 
-                "delegate", "do", "double", "else", "enum", "event", "explicit", 
-                "extern", "false", "finally", "fixed", "float", "for", "foreach", 
-                "goto", "if", "implicit", "in", "int", "interface", "internal", "is", 
-                "lock", "long", "namespace", "new", "null", "object", "operator", 
-                "out", "override", "params", "private", "protected", "public", 
-                "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof", 
-                "stackalloc", "static", "string", "struct", "switch", "this", "throw", 
-                "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", 
-                "ushort", "using", "virtual", "void", "volatile", "while",
-                
-                // Contextual keywords
-                "add", "alias", "and", "ascending", "async", "await", "by", "descending", 
-                "dynamic", "equals", "file", "from", "get", "global", "group", "init", 
-                "into", "join", "let", "managed", "nameof", "not", "on", "or", "orderby", 
-                "partial", "record", "remove", "required", "scoped", "select", "set", 
-                "unmanaged", "value", "var", "when", "where", "with", "yield"
-            };
-
-            // Filters: keywords, declarations, etc.
-            if (allKeywords.Contains(name) ||
+            // named arguments, declarations, LINQ, member access, keywords → skip
+            if (id.Parent is NameColonSyntax ||
+                (new[] {
+                    "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue",
+                    "decimal","default","delegate","do","double","else","enum","event","explicit","extern","false","finally",
+                    "fixed","float","for","foreach","goto","if","implicit","in","int","interface","internal","is","lock","long",
+                    "namespace","new","null","object","operator","out","override","params","private","protected","public",
+                    "readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc","static","string","struct","switch",
+                    "this","throw","true","try","typeof","uint","ulong","unchecked","unsafe","ushort","using","virtual","void",
+                    "volatile","while","add","alias","and","ascending","async","await","by","descending","dynamic","equals","file",
+                    "from","get","global","group","init","into","join","let","managed","nameof","not","on","or","orderby","partial",
+                    "record","remove","required","scoped","select","set","unmanaged","value","var","when","where","with","yield"}
+                    ).Contains(name) ||
                 id.Parent is VariableDeclaratorSyntax ||
                 id.Parent is ParameterSyntax ||
                 id.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
                 (id.Parent is MemberAccessExpressionSyntax ma && ma.Name == id) ||
                 id.Parent is MemberBindingExpressionSyntax ||
-                id.Ancestors()
-                  .OfType<InvocationExpressionSyntax>()
+                id.Ancestors().OfType<InvocationExpressionSyntax>()
                   .Any(inv => inv.Expression is IdentifierNameSyntax invId &&
                               invId.Identifier.ValueText == "nameof"))
             {
@@ -160,81 +160,66 @@ namespace SuggestMembersAnalyzer
 
             var model = context.SemanticModel;
             var info  = model.GetSymbolInfo(id);
-
-            // If symbol is found or overload resolution failed, skip
             if (info.Symbol != null ||
                 info.CandidateReason == CandidateReason.OverloadResolutionFailure)
             {
                 return;
             }
 
-            // Check if this is a type in a variable declaration with 'var'
-            // e.g., "var x = new MyClass();" - here 'var' is the type
             if (id.Parent is VariableDeclarationSyntax varDecl && varDecl.Type == id)
             {
                 return;
             }
 
-            // Additional check for identifiers in query expressions (LINQ)
             if (id.Ancestors().Any(n => n is QueryExpressionSyntax || n is AnonymousObjectMemberDeclaratorSyntax))
             {
                 return;
             }
 
-            // Collect local symbols
-            var symbols = model.LookupSymbols(id.SpanStart)
-                .Where(s => s.Kind is SymbolKind.Local
-                         or SymbolKind.Parameter
-                         or SymbolKind.Field
-                         or SymbolKind.Property
-                         or SymbolKind.Method)
-                .ToList();
+            // collect available local symbols
+            var locals = model.LookupSymbols(id.SpanStart)
+                              .Where(s => s.Kind is SymbolKind.Local
+                                       or SymbolKind.Parameter
+                                       or SymbolKind.Field
+                                       or SymbolKind.Property
+                                       or SymbolKind.Method);
 
-            // + all types
-            var typeNames = GetAllTypeNames(context.Compilation);
-
-            var symbolEntries = symbols.Select(s => (Key: s.Name, Value: (object)s));
-            var typeEntries   = typeNames.Select(fn =>
+            // + all types from project and references
+            var typeEntries = allTypeNames.Select(fn =>
             {
                 var parts = fn.Split('.');
                 return (Key: parts[parts.Length - 1], Value: (object)fn);
             });
-            var entries = symbolEntries.Concat(typeEntries).ToList();
 
-            var similar = Utils.StringSimilarity
-                .FindSimilarSymbols(name, entries)
+            var symbolEntries = locals.Select(s => (Key: s.Name, Value: (object)s));
+            var candidates = symbolEntries.Concat(typeEntries);
+
+            // find similar identifiers
+            var similar = StringSimilarity
+                .FindSimilarSymbols(name, candidates)
                 .Select(r => r.Value)
                 .ToList();
 
-            if (!similar.Any())
+            if (similar.Count == 0)
             {
                 return;
             }
 
-            // Determine the kind (Class, Local, Field, Property, Method)
+            // first item determines kind
             var entityKind = similar[0] != null ? SymbolFormatter.GetEntityKind(similar[0]) : "Identifier";
 
-            // Format suggestions
-            var formatted = similar.Select(v =>
-            {
-                if (v is ISymbol sym)
-                {
-                    return SymbolFormatter.FormatSymbol(sym);
-                }
-
-                return "[Class] " + v;
-            }).ToList();
-
+            // format all suggestions
+            var formatted = similar.Select(v => v != null ? SymbolFormatter.FormatAny(v) : "").ToList();
             var suggestionText = "\n- " + string.Join("\n- ", formatted);
 
-            var diagnostic = Diagnostic.Create(
-                VariableNotFoundRule,
+            var diag = Diagnostic.Create(
+                Rule,
                 id.GetLocation(),
                 entityKind,
                 name,
                 suggestionText);
 
-            context.ReportDiagnostic(diagnostic);
+            context.ReportDiagnostic(diag);
         }
     }
 }

@@ -63,6 +63,10 @@ namespace SuggestMembersAnalyzer
             context.RegisterSyntaxNodeAction(AnalyzeArgument, SyntaxKind.Argument);
         }
 
+        /// <summary>
+        /// Analyzes an argument node to detect incorrect named arguments and suggest alternatives.
+        /// </summary>
+        /// <param name="context">The syntax node analysis context containing the node to analyze</param>
         private static void AnalyzeArgument(SyntaxNodeAnalysisContext context)
         {
             var arg = (ArgumentSyntax)context.Node;
