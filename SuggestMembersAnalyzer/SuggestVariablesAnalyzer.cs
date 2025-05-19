@@ -133,7 +133,7 @@ namespace SuggestMembersAnalyzer
             var id = (IdentifierNameSyntax)context.Node;
             var name = id.Identifier.ValueText;
 
-            // named arguments, declarations, LINQ, member access, keywords → skip
+            // named arguments, declarations, LINQ, member access, keywords, XML comments → skip
             if (id.Parent is NameColonSyntax ||
                 (new[] {
                     "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue",
@@ -151,6 +151,7 @@ namespace SuggestMembersAnalyzer
                 id.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
                 (id.Parent is MemberAccessExpressionSyntax ma && ma.Name == id) ||
                 id.Parent is MemberBindingExpressionSyntax ||
+                IsInXmlComment(id) || // Skip identifiers in XML documentation
                 id.Ancestors().OfType<InvocationExpressionSyntax>()
                   .Any(inv => inv.Expression is IdentifierNameSyntax invId &&
                               invId.Identifier.ValueText == "nameof"))
@@ -220,6 +221,51 @@ namespace SuggestMembersAnalyzer
                 suggestionText);
 
             context.ReportDiagnostic(diag);
+        }
+
+        /// <summary>
+        /// Determines if the identifier node is located within XML documentation.
+        /// This helps avoid flagging parameter names in XML documentation that may have typos.
+        /// </summary>
+        /// <param name="identifierNode">The identifier node to check</param>
+        /// <returns>True if the identifier is within XML documentation, false otherwise</returns>
+        private static bool IsInXmlComment(SyntaxNode identifierNode)
+        {
+            // Get the syntax tree
+            var syntaxTree = identifierNode.SyntaxTree;
+            
+            // Get full node span
+            var span = identifierNode.Span;
+            
+            // Get all the trivia in the document
+            var root = syntaxTree.GetRoot();
+            var trivias = root.DescendantTrivia();
+            
+            // Check if the node is within any XML documentation comments
+            foreach (var trivia in trivias)
+            {
+                if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) || 
+                    trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                {
+                    // If the trivia span contains our identifier node, it's in an XML comment
+                    if (trivia.Span.Contains(span) || trivia.FullSpan.Contains(span))
+                    {
+                        return true;
+                    }
+                    
+                    // For structured XML comments, also check the structured trivia
+                    if (trivia.HasStructure)
+                    {
+                        var structure = trivia.GetStructure();
+                        if (structure != null && structure.FullSpan.Contains(span))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
         }
     }
 }
