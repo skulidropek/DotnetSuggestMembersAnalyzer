@@ -98,4 +98,14 @@
   <data name="NamedArgumentNotFoundDescription" xml:space="preserve">
     <value>This named argument does not exist for the method or constructor.</value>
   </data>
+  
+  <data name="UseNameofInsteadOfStringTitle" xml:space="preserve">
+    <value>Use nameof instead of string literal</value>
+  </data>
+  <data name="UseNameofInsteadOfStringMessageFormat" xml:space="preserve">
+    <value>Nameof '{0}' does not exist, Did you mean: {1}</value>
+  </data>
+  <data name="UseNameofInsteadOfStringDescription" xml:space="preserve">
+    <value>Using nameof() is more refactoring-friendly than string literals for referencing code elements.</value>
+  </data>
 </root> 

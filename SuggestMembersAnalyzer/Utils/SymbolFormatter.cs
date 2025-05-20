@@ -30,14 +30,14 @@ namespace SuggestMembersAnalyzer.Utils
         /// Formats any entry (ISymbol or string) with a [Kind] prefix.
         /// </summary>
         public static string FormatAny(object entry) => entry switch
-        {
+            {
             ISymbol sym                                            => FormatSymbol(sym),
             string s when s.EndsWith(AttributeSuffix, StringComparison.Ordinal)
                                                                   => FormatAttributeFromString(s),
             string s                                                => "[Class]     " + s,
             _                                                       => entry?.ToString() ?? string.Empty
-        };
-
+            };
+        
         /// <summary>
         /// Formats a Roslyn symbol with kind tag and minimal signature.
         /// </summary>
@@ -96,9 +96,9 @@ namespace SuggestMembersAnalyzer.Utils
                     var name = method.Name.Substring(4);
                     var prop = method.ContainingType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
                     if (prop != null)
-                    {
+                            {
                         return GetPropertySignature(prop);
-                    }
+                            }
 
                     var pType = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
                     return $"{GetFormattedTypeName(pType)} {name} {{ set; }}";
@@ -118,23 +118,23 @@ namespace SuggestMembersAnalyzer.Utils
                 if (method.IsGenericMethod && method.TypeParameters.Length > 0)
                 {
                     sb.Append('<')
-                      .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
-                      .Append('>');
+                    .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
+                    .Append('>');
                 }
 
                 sb.Append('(')
-                  .Append(string.Join(", ", method.Parameters.Select(p =>
-                  {
-                      var mod = p.RefKind switch
-                      {
-                          RefKind.Ref => "ref ",
-                          RefKind.Out => "out ",
-                          RefKind.In  => "in ",
-                          _           => ""
-                      };
-                      return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
-                  })))
-                  .Append(')');
+                .Append(string.Join(", ", method.Parameters.Select(p =>
+                {
+                    var mod = p.RefKind switch
+                    {
+                        RefKind.Ref => "ref ",
+                        RefKind.Out => "out ",
+                        RefKind.In  => "in ",
+                        _           => ""
+                    };
+                    return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
+                })))
+                .Append(')');
 
                 return sb.ToString();
             }
@@ -202,13 +202,13 @@ namespace SuggestMembersAnalyzer.Utils
                 return member.Name;
             }
 
-            return member switch
-            {
-                IMethodSymbol   m => GetMethodSignature(m),
-                IPropertySymbol p => GetPropertySignature(p),
-                IFieldSymbol    f => $"{(f.IsStatic ? "static " : "")}{GetFormattedTypeName(f.Type)} {f.Name}",
+                return member switch
+                {
+                    IMethodSymbol   m => GetMethodSignature(m),
+                    IPropertySymbol p => GetPropertySignature(p),
+                    IFieldSymbol    f => $"{(f.IsStatic ? "static " : "")}{GetFormattedTypeName(f.Type)} {f.Name}",
                 _                 => member.Name
-            };
+                };
         }
 
         public static string GetFormattedTypeName(this ITypeSymbol type)

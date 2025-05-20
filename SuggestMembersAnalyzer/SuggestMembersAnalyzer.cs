@@ -36,16 +36,16 @@ namespace SuggestMembersAnalyzer
         private static readonly DiagnosticDescriptor Rule = new(
             id:               Id,
             title:            new LocalizableResourceString(
-                                  nameof(Resources.MemberNotFoundTitle),
-                                  Resources.ResourceManager,
+                nameof(Resources.MemberNotFoundTitle),
+                Resources.ResourceManager,
                                   typeof(Resources)),
             messageFormat:    new LocalizableResourceString(
-                                  nameof(Resources.MemberNotFoundMessageFormat),
-                                  Resources.ResourceManager,
-                                  typeof(Resources)),
+                    nameof(Resources.MemberNotFoundMessageFormat),
+                    Resources.ResourceManager,
+                    typeof(Resources)),
             category:         Category,
             defaultSeverity:  DiagnosticSeverity.Error,
-            isEnabledByDefault: true,
+                isEnabledByDefault: true,
             description:      new LocalizableResourceString(
                                   nameof(Resources.MemberNotFoundDescription),
                                   Resources.ResourceManager,
@@ -279,7 +279,7 @@ namespace SuggestMembersAnalyzer
             if (memberNameSyntax is null || targetExpression is null)
             {
                 if (ctx.Node is MemberAccessExpressionSyntax ma && ma.Parent is not AttributeSyntax)
-                {
+                    {
                     memberNameSyntax = ma.Name;
                     targetExpression = ma.Expression;
                 }
@@ -312,13 +312,13 @@ namespace SuggestMembersAnalyzer
             var tInfo    = model.GetTypeInfo(targetExpression);
             var exprType = tInfo.Type ?? tInfo.ConvertedType
                          ?? (model.GetSymbolInfo(targetExpression).Symbol switch
-                         {
-                             ILocalSymbol    loc => loc.Type,
-                             IFieldSymbol    fld => fld.Type,
-                             IPropertySymbol prp => prp.Type,
-                             IParameterSymbol par => par.Type,
-                             IMethodSymbol   mth => mth.ReturnType,
-                             _                   => null
+                {
+                    ILocalSymbol    loc => loc.Type,
+                    IFieldSymbol    fld => fld.Type,
+                    IPropertySymbol prp => prp.Type,
+                    IParameterSymbol par => par.Type,
+                    IMethodSymbol   mth => mth.ReturnType,
+                    _                   => null
                          });
             if (exprType is null)
             {

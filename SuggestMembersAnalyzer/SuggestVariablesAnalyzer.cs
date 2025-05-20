@@ -176,9 +176,26 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
 
     // ───────────────────────────────────────────────────────────── Helpers
     /// <summary>Return true if "nameof(x)" pattern surrounds <paramref name="id"/>.</summary>
-    private static bool IsNameOfOperand(IdentifierNameSyntax id) =>
-        id.Parent is InvocationExpressionSyntax { Expression: IdentifierNameSyntax inv }
-        && inv.Identifier.ValueText.Equals("nameof", StringComparison.Ordinal);
+    private static bool IsNameOfOperand(IdentifierNameSyntax id)
+    {
+        // Check for nameof(IdentifierName) pattern
+        if (id.Parent is InvocationExpressionSyntax { Expression: IdentifierNameSyntax inv }
+            && inv.Identifier.ValueText.Equals("nameof", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Check for parent argument of nameof
+        if (id.Parent is ArgumentSyntax arg && 
+            arg.Parent is ArgumentListSyntax argList &&
+            argList.Parent is InvocationExpressionSyntax { Expression: IdentifierNameSyntax nameofExpr } &&
+            nameofExpr.Identifier.ValueText.Equals("nameof", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
+    }
 
     /// <summary>Checks whether <paramref name="id"/> is exactly in a type-usage position.</summary>
     private static bool IsTypePosition(IdentifierNameSyntax id) =>

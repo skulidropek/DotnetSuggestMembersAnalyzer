@@ -10,3 +10,4 @@ Rule ID | Category | Severity | Notes
 SMB001 | Usage | Error | MemberNotFoundRule
 SMB002 | Usage | Error | VariableNotFoundRule
 SMB003 | Usage | Error | NamespaceNotFoundRule
+SMB004 | Usage | Error | NamedArgumentNotFoundRule

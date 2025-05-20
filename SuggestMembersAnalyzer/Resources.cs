@@ -76,6 +76,36 @@ namespace SuggestMembersAnalyzer
         /// </summary>
         internal static string NamedArgumentNotFoundDescription => GetString("NamedArgumentNotFoundDescription");
 
+        /// <summary>
+        /// The title for the invalid nameof argument diagnostic
+        /// </summary>
+        internal static string InvalidNameofArgumentTitle => GetString("InvalidNameofArgumentTitle");
+
+        /// <summary>
+        /// The message format for the invalid nameof argument diagnostic
+        /// </summary>
+        internal static string InvalidNameofArgumentMessageFormat => GetString("InvalidNameofArgumentMessageFormat");
+
+        /// <summary>
+        /// The description for the invalid nameof argument diagnostic
+        /// </summary>
+        internal static string InvalidNameofArgumentDescription => GetString("InvalidNameofArgumentDescription");
+
+        /// <summary>
+        /// The title for the use nameof instead of string diagnostic
+        /// </summary>
+        internal static string UseNameofInsteadOfStringTitle => GetString("UseNameofInsteadOfStringTitle");
+
+        /// <summary>
+        /// The message format for the use nameof instead of string diagnostic
+        /// </summary>
+        internal static string UseNameofInsteadOfStringMessageFormat => GetString("UseNameofInsteadOfStringMessageFormat");
+
+        /// <summary>
+        /// The description for the use nameof instead of string diagnostic
+        /// </summary>
+        internal static string UseNameofInsteadOfStringDescription => GetString("UseNameofInsteadOfStringDescription");
+
         private static string GetString(string resourceName)
         {
             // For Roslyn analyzers, we shouldn't use the CurrentUICulture
@@ -126,6 +156,24 @@ namespace SuggestMembersAnalyzer
 
                 case "NamedArgumentNotFoundDescription":
                     return "This named argument does not exist for the method or constructor.";
+
+                case "InvalidNameofArgumentTitle":
+                    return "Invalid nameof argument";
+
+                case "InvalidNameofArgumentMessageFormat":
+                    return "Argument '{0}' in nameof() does not exist";
+
+                case "InvalidNameofArgumentDescription":
+                    return "The argument used in the nameof() operator does not exist in the current scope.";
+
+                case "UseNameofInsteadOfStringTitle":
+                    return "Use nameof instead of string literal";
+
+                case "UseNameofInsteadOfStringMessageFormat":
+                    return "Nameof '{0}' does not exist, Did you mean: {1}";
+
+                case "UseNameofInsteadOfStringDescription":
+                    return "Using nameof() is more refactoring-friendly than string literals for referencing code elements.";
 
                 default:
                     return resourceName;

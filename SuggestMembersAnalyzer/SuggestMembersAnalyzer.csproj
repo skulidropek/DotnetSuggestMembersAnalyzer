@@ -81,7 +81,6 @@
     </PropertyGroup>
   </Target>
 
-  <!-- Add self-analysis: project will analyze itself -->
   <Target Name="AddSelfAsAnalyzer" BeforeTargets="CoreCompile" Condition="Exists('$(OutDir)$(AssemblyName).dll')">
     <ItemGroup>
       <Analyzer Include="$(OutDir)$(AssemblyName).dll" />
