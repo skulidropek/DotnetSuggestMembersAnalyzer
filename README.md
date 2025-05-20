@@ -34,6 +34,9 @@ Install-Package SuggestMembersAnalyzer
 * **Suggest Named Arguments (SMB004)**
   Detects misspelled named arguments and provides suggestions with complete signatures for methods and constructors.
 
+* **Suggest Using Nameof (SMB005)**
+  Recommends using nameof() operator instead of string literals when referencing code elements, making code more refactoring-friendly.
+
 ---
 
 ## ⚙️ Usage
@@ -66,6 +69,7 @@ dotnet_diagnostic.SMB001.severity = error
 dotnet_diagnostic.SMB002.severity = error
 dotnet_diagnostic.SMB003.severity = error
 dotnet_diagnostic.SMB004.severity = error
+dotnet_diagnostic.SMB005.severity = error
 ```
 
 ---
