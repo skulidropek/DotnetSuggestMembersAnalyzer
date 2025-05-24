@@ -17,6 +17,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// Initializes the formatter with the current compilation context.
         /// Call this at the beginning of analysis to enable enhanced attribute formatting.
         /// </summary>
+        /// <param name="compilation">The compilation context to use</param>
         public static void Initialize(Compilation compilation)
         {
             _currentCompilation = compilation;
@@ -29,6 +30,8 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Formats any entry (ISymbol or string) with a [Kind] prefix.
         /// </summary>
+        /// <param name="entry">The entry to format (ISymbol or string)</param>
+        /// <returns>Formatted string with kind prefix</returns>
         public static string FormatAny(object entry) => entry switch
             {
             ISymbol sym                                            => FormatSymbol(sym),
@@ -41,6 +44,8 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Formats a Roslyn symbol with kind tag and minimal signature.
         /// </summary>
+        /// <param name="symbol">The symbol to format</param>
+        /// <returns>Formatted string with kind tag and signature</returns>
         public static string FormatSymbol(ISymbol symbol) => symbol switch
         {
             IMethodSymbol m when IsAttributeCtor(m)                => FormatAttributeCtor(m),
@@ -58,6 +63,8 @@ namespace SuggestMembersAnalyzer.Utils
 
 
         /// <summary>Returns a readable kind name for diagnostics.</summary>
+        /// <param name="entry">The entry to get kind for</param>
+        /// <returns>Readable kind name</returns>
         public static string GetEntityKind(object entry) => entry switch
         {
             INamedTypeSymbol t when IsAttributeType(t)         => "Attribute",
@@ -138,7 +145,7 @@ namespace SuggestMembersAnalyzer.Utils
 
                 return sb.ToString();
             }
-            catch
+            catch (Exception)
             {
                 return method.Name + "()";
             }
@@ -186,7 +193,7 @@ namespace SuggestMembersAnalyzer.Utils
                 sb.Append('}');
                 return sb.ToString();
             }
-            catch
+            catch (Exception)
             {
                 return property.Name;
             }
@@ -195,6 +202,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Returns member name or full signature depending on <paramref name="includeSignature"/>.
         /// </summary>
+        /// <param name="member">The symbol member to format</param>
+        /// <param name="includeSignature">Whether to include full signature or just name</param>
+        /// <returns>Formatted member representation</returns>
         public static string GetFormattedMemberRepresentation(this ISymbol member, bool includeSignature)
         {
             if (!includeSignature)

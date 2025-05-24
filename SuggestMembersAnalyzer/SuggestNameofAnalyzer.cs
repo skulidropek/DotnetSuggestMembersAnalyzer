@@ -52,6 +52,7 @@ namespace SuggestMembersAnalyzer
         /// <summary>
         /// Analyzes invocations of nameof operator and validates that the arguments exist.
         /// </summary>
+        /// <param name="context">Analysis context</param>
         private static void AnalyzeNameofInvocation(SyntaxNodeAnalysisContext context)
         {
             var invocation = (InvocationExpressionSyntax)context.Node;
@@ -110,6 +111,9 @@ namespace SuggestMembersAnalyzer
         /// <summary>
         /// Finds symbols similar to the given expression to suggest as alternatives.
         /// </summary>
+        /// <param name="context">Analysis context</param>
+        /// <param name="expression">Expression to find similar symbols for</param>
+        /// <returns>Formatted string of suggestions</returns>
         private static string FindSimilarSymbols(SyntaxNodeAnalysisContext context, ExpressionSyntax expression)
         {
             // Lookup visible symbols at this location

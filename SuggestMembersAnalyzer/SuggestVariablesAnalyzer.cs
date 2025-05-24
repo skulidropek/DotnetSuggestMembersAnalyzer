@@ -84,6 +84,8 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
     /// <summary>
     /// Analyse each <see cref="IdentifierNameSyntax"/> that failed binding and emit SMB002 suggestions.
     /// </summary>
+    /// <param name="context">Analysis context</param>
+    /// <param name="allTypeNames">Collection of all available type names</param>
     private static void AnalyzeIdentifier(
         SyntaxNodeAnalysisContext context,
         ImmutableArray<string> allTypeNames)
@@ -176,6 +178,8 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
 
     // ───────────────────────────────────────────────────────────── Helpers
     /// <summary>Return true if "nameof(x)" pattern surrounds <paramref name="id"/>.</summary>
+    /// <param name="id">Identifier syntax to check</param>
+    /// <returns>True if identifier is within nameof() expression</returns>
     private static bool IsNameOfOperand(IdentifierNameSyntax id)
     {
         // Check for nameof(IdentifierName) pattern
@@ -198,6 +202,8 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>Checks whether <paramref name="id"/> is exactly in a type-usage position.</summary>
+    /// <param name="id">Identifier syntax to check</param>
+    /// <returns>True if identifier is in type position</returns>
     private static bool IsTypePosition(IdentifierNameSyntax id) =>
         id.Parent switch
         {
@@ -229,6 +235,8 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
     /// <summary>
     /// Collects fully-qualified names of all types available to the compilation (source + metadata).
     /// </summary>
+    /// <param name="compilation">The compilation to collect types from</param>
+    /// <returns>Array of fully-qualified type names</returns>
     private static ImmutableArray<string> CollectAllTypeNames(Compilation compilation)
     {
         var result = new List<string>(capacity: 1024);
@@ -272,6 +280,8 @@ public sealed class SuggestVariablesAnalyzer : DiagnosticAnalyzer
     /// <summary>
     /// Fast check for XML doc trivia without walking entire trivia tree.
     /// </summary>
+    /// <param name="node">Syntax node to check</param>
+    /// <returns>True if node is part of XML documentation</returns>
     private static bool IsInXmlComment(SyntaxNode node)
         => node.IsPartOfStructuredTrivia();
 }

@@ -88,6 +88,7 @@ namespace SuggestMembersAnalyzer
         /// When inside an object initializer, only fields/properties should be suggested.
         /// Redirects to <see cref="AnalyzeMemberAccess"/> with <c>restrictToFieldsAndProps = true</c>.
         /// </summary>
+        /// <param name="ctx">Analysis context</param>
         private static void AnalyzeObjectInitializerAssignment(SyntaxNodeAnalysisContext ctx)
         {
             var assign = (AssignmentExpressionSyntax)ctx.Node;
@@ -132,6 +133,11 @@ namespace SuggestMembersAnalyzer
         /// then walk each namespace imported via <c>using</c> to catch
         /// any static extension classes missed by LookupSymbols.
         /// </summary>
+        /// <param name="receiverType">Type to find extension methods for</param>
+        /// <param name="model">Semantic model for symbol resolution</param>
+        /// <param name="position">Position in syntax tree for scope resolution</param>
+        /// <param name="seenNames">Set to track already discovered method names</param>
+        /// <param name="entries">List to add discovered extension methods to</param>
         private static void AddVisibleExtensionMethods(
             ITypeSymbol                receiverType,
             SemanticModel              model,
@@ -193,6 +199,10 @@ namespace SuggestMembersAnalyzer
                                 TryAdd(m);
                             }
 
+                            break;
+
+                        default:
+                            // ignore non-namespace, non-static types
                             break;
                     }
                 }

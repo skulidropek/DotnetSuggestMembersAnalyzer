@@ -15,6 +15,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Computes Jaro similarity between two strings
         /// </summary>
+        /// <param name="s1">First string</param>
+        /// <param name="s2">Second string</param>
+        /// <returns>Jaro similarity score between 0.0 and 1.0</returns>
         public static double Jaro(string s1, string s2)
         {
             if (s1 == s2)
@@ -98,6 +101,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Computes Jaro-Winkler similarity between two strings
         /// </summary>
+        /// <param name="s1">First string</param>
+        /// <param name="s2">Second string</param>
+        /// <returns>Jaro-Winkler similarity score between 0.0 and 1.0</returns>
         public static double JaroWinkler(string s1, string s2)
         {
             double jaroSim = Jaro(s1, s2);
@@ -136,6 +142,8 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Normalizes a string for similarity comparison by lowercasing and removing underscores and spaces
         /// </summary>
+        /// <param name="str">String to normalize</param>
+        /// <returns>Normalized string</returns>
         public static string Normalize(string str)
         {
             return Regex.Replace(str.ToLowerInvariant(), @"[_\s]", "");
@@ -144,6 +152,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Computes a composite similarity score between the unknown query and a candidate
         /// </summary>
+        /// <param name="unknown">The unknown query string</param>
+        /// <param name="candidate">The candidate string to compare against</param>
+        /// <returns>Composite similarity score</returns>
         public static double ComputeCompositeScore(string unknown, string candidate)
         {
             string normQuery = Normalize(unknown);
@@ -197,6 +208,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Gets a formatted list of members with their signatures and types
         /// </summary>
+        /// <param name="objectType">The type to get members from</param>
+        /// <param name="requestedName">The name being searched for</param>
+        /// <returns>List of formatted member strings</returns>
         public static List<string> GetFormattedMembersList(ITypeSymbol objectType, string requestedName)
         {
             const double MinScore = 0.3;
@@ -243,7 +257,7 @@ namespace SuggestMembersAnalyzer.Utils
 
                     result.Add((member.Name, displayName, score));
                 }
-                catch
+                catch (Exception)
                 {
                     // In case of error, add just the member name
                     double score = ComputeCompositeScore(requestedName, member.Name);
@@ -263,6 +277,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Finds possible exported symbols that match the requested name
         /// </summary>
+        /// <param name="requestedName">The name to search for</param>
+        /// <param name="moduleSymbol">The namespace symbol to search in</param>
+        /// <returns>List of matching exported symbols with scores</returns>
         public static List<(string name, double score)> FindPossibleExports(
             string requestedName,
             INamespaceSymbol moduleSymbol)
@@ -286,7 +303,7 @@ namespace SuggestMembersAnalyzer.Utils
                     .Select(item => (item.Name, item.Item2))
                     .ToList();
             }
-            catch
+            catch (Exception)
             {
                 return new List<(string name, double score)>();
             }
@@ -325,6 +342,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>
         /// Finds similar names from a custom list of candidates (simple string array)
         /// </summary>
+        /// <param name="queryName">The name being searched for</param>
+        /// <param name="candidateNames">Array of candidate names to search through</param>
+        /// <returns>List of matching names with similarity scores</returns>
         public static List<(string Name, double Score)> FindSimilarLocalSymbols(
             string queryName,
             string[] candidateNames)

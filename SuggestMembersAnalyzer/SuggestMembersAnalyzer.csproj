@@ -30,13 +30,17 @@
     <!-- Configure rules for analyzer release tracking -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <NoWarn>S1075</NoWarn>
+    <NoWarn>S1075,CC0105,CC0001</NoWarn>
     
     <!-- Обязательно для правильной работы IntelliSense с автогенерируемыми ресурсами -->
     <CoreCompileDependsOn>PrepareResources;$(CompileDependsOn)</CoreCompileDependsOn>
   </PropertyGroup>
 
    <ItemGroup>
+    <PackageReference Include="CodeCracker.CSharp" Version="1.1.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Philips.CodeAnalysis.DuplicateCodeAnalyzer" Version="1.1.7">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
