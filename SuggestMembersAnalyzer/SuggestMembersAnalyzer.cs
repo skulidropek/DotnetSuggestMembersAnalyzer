@@ -1,16 +1,20 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
-using SuggestMembersAnalyzer.Utils;
+// <copyright file="SuggestMembersAnalyzer.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
-namespace SuggestMembersAnalyzer
+namespace SuggestMembersAnalyzer.Analyzers
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
+    using System.Threading;
+    using global::SuggestMembersAnalyzer.Utils;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
+    using Microsoft.CodeAnalysis.Diagnostics;
+
     /// <summary>
     /// Roslyn analyzer that reports an error when a member access cannot be resolved
     /// and suggests up to five of the most similar existing members.
@@ -23,43 +27,37 @@ namespace SuggestMembersAnalyzer
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public sealed class SuggestMembersAnalyzer : DiagnosticAnalyzer
     {
-        #region Diagnostic metadata
-
         /// <summary>
         /// The diagnostic ID raised when a member is not found.
         /// </summary>
         public const string Id = "SMB001";
 
-        private const string Category    = "Usage";
+        private const string Category = "Usage";
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
-        private static readonly DiagnosticDescriptor Rule = new(
-            id:               Id,
-            title:            new LocalizableResourceString(
+        private static readonly DiagnosticDescriptor Rule = new (
+            id: Id,
+            title: new LocalizableResourceString(
                 nameof(Resources.MemberNotFoundTitle),
                 Resources.ResourceManager,
-                                  typeof(Resources)),
-            messageFormat:    new LocalizableResourceString(
+                typeof(Resources)),
+            messageFormat: new LocalizableResourceString(
                     nameof(Resources.MemberNotFoundMessageFormat),
                     Resources.ResourceManager,
                     typeof(Resources)),
-            category:         Category,
-            defaultSeverity:  DiagnosticSeverity.Error,
-                isEnabledByDefault: true,
-            description:      new LocalizableResourceString(
+            category: Category,
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: new LocalizableResourceString(
                                   nameof(Resources.MemberNotFoundDescription),
                                   Resources.ResourceManager,
                                   typeof(Resources)),
-            helpLinkUri:      HelpLinkUri,
-            customTags:       "AnalyzerReleaseTracking");
+            helpLinkUri: HelpLinkUri,
+            customTags: "AnalyzerReleaseTracking");
 
         /// <inheritdoc/>
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
             => ImmutableArray.Create(Rule);
-
-        #endregion
-
-        #region Initialization
 
         /// <inheritdoc/>
         public override void Initialize(AnalysisContext context)
@@ -80,15 +78,11 @@ namespace SuggestMembersAnalyzer
                 SyntaxKind.SimpleAssignmentExpression);
         }
 
-        #endregion
-
-        #region Object-Initializer Support
-
         /// <summary>
         /// When inside an object initializer, only fields/properties should be suggested.
         /// Redirects to <see cref="AnalyzeMemberAccess"/> with <c>restrictToFieldsAndProps = true</c>.
         /// </summary>
-        /// <param name="ctx">Analysis context</param>
+        /// <param name="ctx">Analysis context.</param>
         private static void AnalyzeObjectInitializerAssignment(SyntaxNodeAnalysisContext ctx)
         {
             var assign = (AssignmentExpressionSyntax)ctx.Node;
@@ -107,6 +101,7 @@ namespace SuggestMembersAnalyzer
                     memberNameSyntax: propName,
                     targetExpression: creation);
             }
+
             // Nested initializer: ParentProp = { SubProp = value }
             else if (init.Parent is AssignmentExpressionSyntax parentAssign &&
                      assign.Left is IdentifierNameSyntax nestedName &&
@@ -120,10 +115,6 @@ namespace SuggestMembersAnalyzer
             }
         }
 
-        #endregion
-
-        #region Extension-Method Discovery
-
         /// <summary>
         /// Adds into <paramref name="entries"/> all extension methods that:
         /// 1) are visible in scope via <c>using</c>-directives, and
@@ -133,26 +124,27 @@ namespace SuggestMembersAnalyzer
         /// then walk each namespace imported via <c>using</c> to catch
         /// any static extension classes missed by LookupSymbols.
         /// </summary>
-        /// <param name="receiverType">Type to find extension methods for</param>
-        /// <param name="model">Semantic model for symbol resolution</param>
-        /// <param name="position">Position in syntax tree for scope resolution</param>
-        /// <param name="seenNames">Set to track already discovered method names</param>
-        /// <param name="entries">List to add discovered extension methods to</param>
+        /// <param name="receiverType">Type to find extension methods for.</param>
+        /// <param name="model">Semantic model for symbol resolution.</param>
+        /// <param name="position">Position in syntax tree for scope resolution.</param>
+        /// <param name="seenNames">Set to track already discovered method names.</param>
+        /// <param name="entries">List to add discovered extension methods to.</param>
         private static void AddVisibleExtensionMethods(
-            ITypeSymbol                receiverType,
-            SemanticModel              model,
-            int                        position,
-            HashSet<string>            seenNames,
+            ITypeSymbol receiverType,
+            SemanticModel model,
+            int position,
+            HashSet<string> seenNames,
             List<(string Name, ISymbol Symbol)> entries)
         {
             var compilation = model.Compilation;
 
             // --- 1) Fast path: symbols that LookupSymbols already makes visible ---
             foreach (var method in model
-                         .LookupSymbols(position,
-                                        container: null,
-                                        name: null,
-                                        includeReducedExtensionMethods: true)
+                         .LookupSymbols(
+                             position,
+                             container: null,
+                             name: null,
+                             includeReducedExtensionMethods: true)
                          .OfType<IMethodSymbol>())
             {
                 TryAdd(method);
@@ -212,7 +204,7 @@ namespace SuggestMembersAnalyzer
             void TryAdd(IMethodSymbol m)
             {
                 IMethodSymbol? candidate;
-                
+
                 if (m.MethodKind == MethodKind.ReducedExtension)
                 {
                     candidate = m;
@@ -256,20 +248,16 @@ namespace SuggestMembersAnalyzer
                 }
 
                 var thisParam = ext.Parameters[0].Type;
-                var conv      = compilation.ClassifyConversion(receiverType, thisParam);
+                var conv = compilation.ClassifyConversion(receiverType, thisParam);
                 return (conv.Exists && !conv.IsExplicit) ? ext : null;
             }
         }
-
-        #endregion
-
-        #region Main Analysis Pipeline
 
         /// <summary>
         /// Core routine: if <paramref name="memberNameSyntax"/> doesn't bind,
         /// gather instance + extension candidates, find similar names, and report SMB001.
         /// </summary>
-        /// <param name="ctx">Analysis context</param>
+        /// <param name="ctx">Analysis context.</param>
         /// <param name="restrictToFieldsAndProps">
         ///   If true, only fields and properties will be suggested (object-initializer).
         /// </param>
@@ -281,15 +269,15 @@ namespace SuggestMembersAnalyzer
         /// </param>
         private static void AnalyzeMemberAccess(
             SyntaxNodeAnalysisContext ctx,
-            bool                      restrictToFieldsAndProps,
-            SimpleNameSyntax?         memberNameSyntax = null,
-            ExpressionSyntax?         targetExpression  = null)
+            bool restrictToFieldsAndProps,
+            SimpleNameSyntax? memberNameSyntax = null,
+            ExpressionSyntax? targetExpression = null)
         {
             // 1) Resolve syntax nodes if not provided
             if (memberNameSyntax is null || targetExpression is null)
             {
                 if (ctx.Node is MemberAccessExpressionSyntax ma && ma.Parent is not AttributeSyntax)
-                    {
+                {
                     memberNameSyntax = ma.Name;
                     targetExpression = ma.Expression;
                 }
@@ -300,6 +288,7 @@ namespace SuggestMembersAnalyzer
                     targetExpression = ca.Expression;
                 }
             }
+
             if (memberNameSyntax is null || targetExpression is null)
             {
                 return;
@@ -307,7 +296,7 @@ namespace SuggestMembersAnalyzer
 
             // Extract the unknown identifier
             string missing = memberNameSyntax.Identifier.ValueText;
-            var    model   = ctx.SemanticModel;
+            var model = ctx.SemanticModel;
 
             // 2) If symbol exists or overload candidates exist → bail out
             var symInfo = model.GetSymbolInfo(memberNameSyntax);
@@ -319,17 +308,17 @@ namespace SuggestMembersAnalyzer
             }
 
             // 3) Determine compile-time type of the target expression
-            var tInfo    = model.GetTypeInfo(targetExpression);
+            var tInfo = model.GetTypeInfo(targetExpression);
             var exprType = tInfo.Type ?? tInfo.ConvertedType
-                         ?? (model.GetSymbolInfo(targetExpression).Symbol switch
-                {
-                    ILocalSymbol    loc => loc.Type,
-                    IFieldSymbol    fld => fld.Type,
-                    IPropertySymbol prp => prp.Type,
-                    IParameterSymbol par => par.Type,
-                    IMethodSymbol   mth => mth.ReturnType,
-                    _                   => null
-                         });
+                         ?? model.GetSymbolInfo(targetExpression).Symbol switch
+                         {
+                             ILocalSymbol loc => loc.Type,
+                             IFieldSymbol fld => fld.Type,
+                             IPropertySymbol prp => prp.Type,
+                             IParameterSymbol par => par.Type,
+                             IMethodSymbol mth => mth.ReturnType,
+                             _ => null
+                         };
             if (exprType is null)
             {
                 return;
@@ -337,7 +326,7 @@ namespace SuggestMembersAnalyzer
 
             // 4) Collect instance members (fields, props, methods)
             var entries = new List<(string Name, ISymbol Symbol)>();
-            var seen    = new HashSet<string>(StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
 
             void Add(ISymbol sym)
             {
@@ -350,7 +339,7 @@ namespace SuggestMembersAnalyzer
                 }
 
                 if (restrictToFieldsAndProps
-                    && sym.Kind is not (SymbolKind.Field or SymbolKind.Property))
+                    && sym.Kind is not(SymbolKind.Field or SymbolKind.Property))
                 {
                     return;
                 }
@@ -378,6 +367,7 @@ namespace SuggestMembersAnalyzer
                     Collect(type.BaseType);
                 }
             }
+
             Collect(exprType);
 
             // 5) Add extension methods if allowed
@@ -385,10 +375,10 @@ namespace SuggestMembersAnalyzer
             {
                 AddVisibleExtensionMethods(
                     receiverType: exprType,
-                    model:         model,
-                    position:      memberNameSyntax.SpanStart,
-                    seenNames:     seen,
-                    entries:       entries);
+                    model: model,
+                    position: memberNameSyntax.SpanStart,
+                    seenNames: seen,
+                    entries: entries);
             }
 
             // 6) Find up to five closest matches
@@ -405,21 +395,22 @@ namespace SuggestMembersAnalyzer
 
             var props = new Dictionary<string, string?>
             {
-                ["Suggestions"] = string.Join("|", similar.Select(r => r.Name))
+                ["Suggestions"] = string.Join("|", similar.Select(r => r.Name)),
             }.ToImmutableDictionary();
+
+            var messageArgs = new object[]
+            {
+                missing,               // {0}
+                exprType.Name,         // {1}
+                "\n- " + string.Join("\n- ", lines),  // {2}
+            };
 
             ctx.ReportDiagnostic(
                 Diagnostic.Create(
                     descriptor: Rule,
-                    location:   memberNameSyntax.GetLocation(),
+                    location: memberNameSyntax.GetLocation(),
                     properties: props,
-                    messageArgs: new object[] {
-                        missing,               // {0}
-                        exprType.Name,         // {1}
-                        "\n- " + string.Join("\n- ", lines)  // {2}
-                    }));
+                    messageArgs: messageArgs));
         }
-
-        #endregion
     }
 }

@@ -1,15 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
-using SuggestMembersAnalyzer.Utils;
+// <copyright file="SuggestNamespacesAnalyzer.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace SuggestMembersAnalyzer
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
+    using global::SuggestMembersAnalyzer.Utils;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
+    using Microsoft.CodeAnalysis.Diagnostics;
+
     /// <summary>
     /// Analyzer that suggests correct namespaces for misspelled using-directives.
     /// </summary>
@@ -25,7 +29,7 @@ namespace SuggestMembersAnalyzer
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
         private static readonly DiagnosticDescriptor NamespaceNotFoundRule = new DiagnosticDescriptor(
-            /* id */            NamespaceNotFoundDiagnosticId,
+            /* id */ NamespaceNotFoundDiagnosticId,
             /* title */         Resources.NamespaceNotFoundTitle,
             /* messageFormat */ Resources.NamespaceNotFoundMessageFormat,
             /* category */      Category,
@@ -34,6 +38,9 @@ namespace SuggestMembersAnalyzer
             /* description */   Resources.NamespaceNotFoundDescription,
             /* helpLink */      HelpLinkUri,
             /* customTags */    "AnalyzerReleaseTracking");
+
+        // Cache of all namespaces
+        private static ImmutableArray<string> allNamespaces;
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -50,7 +57,7 @@ namespace SuggestMembersAnalyzer
         /// <summary>
         /// Analyzes a using directive to check if the namespace exists and suggest alternatives if it doesn't.
         /// </summary>
-        /// <param name="context">The syntax node analysis context</param>
+        /// <param name="context">The syntax node analysis context.</param>
         private static void AnalyzeUsingDirective(SyntaxNodeAnalysisContext context)
         {
             var usingDirective = (UsingDirectiveSyntax)context.Node;
@@ -84,20 +91,17 @@ namespace SuggestMembersAnalyzer
             context.ReportDiagnostic(diagnostic);
         }
 
-        // Cache of all namespaces
-        private static ImmutableArray<string> _allNamespaces;
-
         /// <summary>
         /// Gets all available namespaces from the compilation and its referenced assemblies.
         /// Uses a static cache to avoid repeated collection.
         /// </summary>
-        /// <param name="compilation">The compilation containing the namespaces</param>
-        /// <returns>An immutable array of namespace names</returns>
+        /// <param name="compilation">The compilation containing the namespaces.</param>
+        /// <returns>An immutable array of namespace names.</returns>
         private static ImmutableArray<string> GetAllNamespaces(Compilation compilation)
         {
-            if (!_allNamespaces.IsDefaultOrEmpty)
+            if (!allNamespaces.IsDefaultOrEmpty)
             {
-                return _allNamespaces;
+                return allNamespaces;
             }
 
             var builder = ImmutableArray.CreateBuilder<string>();
@@ -111,15 +115,15 @@ namespace SuggestMembersAnalyzer
                 }
             }
 
-            _allNamespaces = builder.Distinct().ToImmutableArray();
-            return _allNamespaces;
+            allNamespaces = builder.Distinct().ToImmutableArray();
+            return allNamespaces;
         }
 
         /// <summary>
         /// Recursively collects namespace names from a namespace symbol hierarchy.
         /// </summary>
-        /// <param name="ns">The namespace symbol to start collection from</param>
-        /// <param name="builder">The builder to add namespace names to</param>
+        /// <param name="ns">The namespace symbol to start collection from.</param>
+        /// <param name="builder">The builder to add namespace names to.</param>
         private static void CollectNamespaces(INamespaceSymbol ns, ImmutableArray<string>.Builder builder)
         {
             var name = ns.ToDisplayString();
@@ -137,9 +141,9 @@ namespace SuggestMembersAnalyzer
         /// <summary>
         /// Finds namespaces with names similar to the requested namespace name.
         /// </summary>
-        /// <param name="compilation">The compilation containing potential namespace matches</param>
-        /// <param name="namespaceName">The namespace name to find alternatives for</param>
-        /// <returns>A collection of similar namespace names</returns>
+        /// <param name="compilation">The compilation containing potential namespace matches.</param>
+        /// <param name="namespaceName">The namespace name to find alternatives for.</param>
+        /// <returns>A collection of similar namespace names.</returns>
         private static IEnumerable<string> GetSimilarNamespaces(Compilation compilation, string namespaceName)
         {
             var allNs = GetAllNamespaces(compilation);

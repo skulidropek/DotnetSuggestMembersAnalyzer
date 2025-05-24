@@ -57,6 +57,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
   </ItemGroup>
 
@@ -77,8 +81,7 @@
 
   <ItemGroup>
     <!-- Современная конфигурация для автогенерации Resources.Designer.cs -->
-    <EmbeddedResource Update="Resources.resx" 
-                      LogicalName="SuggestMembersAnalyzer.Resources.resources">
+    <EmbeddedResource Update="Resources.resx" LogicalName="SuggestMembersAnalyzer.Resources.resources">
       <!-- MSBuild:Compile говорит Visual Studio использовать MSBuild для генерации -->
       <Generator>MSBuild:Compile</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>

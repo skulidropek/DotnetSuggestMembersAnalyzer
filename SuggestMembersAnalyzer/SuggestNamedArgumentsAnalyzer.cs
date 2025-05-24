@@ -1,14 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
+// <copyright file="SuggestNamedArgumentsAnalyzer.cs" company="PlaceholderCompany">
+// Copyright (c) PlaceholderCompany. All rights reserved.
+// </copyright>
 
 namespace SuggestMembersAnalyzer
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Collections.Immutable;
+    using System.Linq;
+    using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
+    using Microsoft.CodeAnalysis.CSharp.Syntax;
+    using Microsoft.CodeAnalysis.Diagnostics;
+
     /// <summary>
     /// Analyzer that reports use of non‐existent named arguments and suggests correct parameter names.
     /// </summary>
@@ -26,10 +30,12 @@ namespace SuggestMembersAnalyzer
             nameof(Resources.NamedArgumentNotFoundTitle),
             Resources.ResourceManager,
             typeof(Resources));
+
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(
             nameof(Resources.NamedArgumentNotFoundMessageFormat),
             Resources.ResourceManager,
             typeof(Resources));
+
         private static readonly LocalizableString Description = new LocalizableResourceString(
             nameof(Resources.NamedArgumentNotFoundDescription),
             Resources.ResourceManager,
@@ -66,7 +72,7 @@ namespace SuggestMembersAnalyzer
         /// <summary>
         /// Analyzes an argument node to detect incorrect named arguments and suggest alternatives.
         /// </summary>
-        /// <param name="context">The syntax node analysis context containing the node to analyze</param>
+        /// <param name="context">The syntax node analysis context containing the node to analyze.</param>
         private static void AnalyzeArgument(SyntaxNodeAnalysisContext context)
         {
             var arg = (ArgumentSyntax)context.Node;
@@ -83,14 +89,14 @@ namespace SuggestMembersAnalyzer
 
             // collect candidate overloads
             IReadOnlyList<IMethodSymbol> candidateMethods;
-            string invokedName = "";
-            string memberType = "";
+            string invokedName = string.Empty;
+            string memberType = string.Empty;
 
             // 1) invocation: foo(bar: 1)
             if (argumentList.Parent is InvocationExpressionSyntax inv)
             {
                 var info = context.SemanticModel.GetSymbolInfo(inv.Expression);
-                
+
                 // Simplify nested ternary
                 if (info.CandidateReason == CandidateReason.OverloadResolutionFailure)
                 {
@@ -104,14 +110,15 @@ namespace SuggestMembersAnalyzer
                 {
                     candidateMethods = Array.Empty<IMethodSymbol>();
                 }
-                
+
                 memberType = "Method";
             }
+
             // 2) object creation: new Ctor(name: "x")
             else if (argumentList.Parent is ObjectCreationExpressionSyntax oc)
             {
                 var info = context.SemanticModel.GetSymbolInfo(oc);
-                
+
                 // Simplify nested ternary
                 if (info.CandidateReason == CandidateReason.OverloadResolutionFailure)
                 {
@@ -125,7 +132,7 @@ namespace SuggestMembersAnalyzer
                 {
                     candidateMethods = Array.Empty<IMethodSymbol>();
                 }
-                
+
                 memberType = "Constructor";
             }
             else
@@ -159,7 +166,8 @@ namespace SuggestMembersAnalyzer
             var signatures = candidateMethods.Select(m =>
             {
                 // parameters
-                string paramList = string.Join(", ",
+                string paramList = string.Join(
+                    ", ",
                     m.Parameters.Select(p =>
                         $"{p.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)} {p.Name}"));
                 if (m.MethodKind == MethodKind.Constructor)
@@ -171,7 +179,7 @@ namespace SuggestMembersAnalyzer
                     // generic
                     string genericArgs = m.IsGenericMethod && m.TypeParameters.Length > 0
                         ? $"<{string.Join(", ", m.TypeParameters.Select(tp => tp.Name))}>"
-                        : "";
+                        : string.Empty;
                     return $"{m.Name}{genericArgs}({paramList})";
                 }
             }).ToList();
