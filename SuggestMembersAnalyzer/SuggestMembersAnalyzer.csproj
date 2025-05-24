@@ -31,6 +31,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <NoWarn>S1075</NoWarn>
+    
+    <!-- Обязательно для правильной работы IntelliSense с автогенерируемыми ресурсами -->
+    <CoreCompileDependsOn>PrepareResources;$(CompileDependsOn)</CoreCompileDependsOn>
   </PropertyGroup>
 
    <ItemGroup>
@@ -50,6 +53,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,7 +72,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Update="Resources.resx" LogicalName="SuggestMembersAnalyzer.Resources.resources" />
+    <!-- Современная конфигурация для автогенерации Resources.Designer.cs -->
+    <EmbeddedResource Update="Resources.resx" 
+                      LogicalName="SuggestMembersAnalyzer.Resources.resources">
+      <!-- MSBuild:Compile говорит Visual Studio использовать MSBuild для генерации -->
+      <Generator>MSBuild:Compile</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <!-- Генерируем файлы в папку obj для чистоты -->
+      <StronglyTypedFileName>$(IntermediateOutputPath)\Resources.Designer.cs</StronglyTypedFileName>
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>SuggestMembersAnalyzer</StronglyTypedNamespace>
+      <StronglyTypedClassName>Resources</StronglyTypedClassName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

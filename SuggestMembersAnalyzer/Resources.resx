@@ -108,4 +108,14 @@
   <data name="UseNameofInsteadOfStringDescription" xml:space="preserve">
     <value>Using nameof() is more refactoring-friendly than string literals for referencing code elements.</value>
   </data>
+  
+  <data name="InvalidNameofArgumentTitle" xml:space="preserve">
+    <value>Invalid nameof argument</value>
+  </data>
+  <data name="InvalidNameofArgumentMessageFormat" xml:space="preserve">
+    <value>Argument '{0}' in nameof() does not exist</value>
+  </data>
+  <data name="InvalidNameofArgumentDescription" xml:space="preserve">
+    <value>The argument used in the nameof() operator does not exist in the current scope.</value>
+  </data>
 </root> 
