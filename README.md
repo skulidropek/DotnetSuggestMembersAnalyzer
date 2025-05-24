@@ -35,7 +35,7 @@ Install-Package SuggestMembersAnalyzer
   Detects misspelled named arguments and provides suggestions with complete signatures for methods and constructors.
 
 * **Suggest Using Nameof (SMB005)**
-  Recommends using nameof() operator instead of string literals when referencing code elements, making code more refactoring-friendly.
+  If an argument to the nameof() operator is invalid, check for the existence of the target symbol and suggest possible names to pass to nameof().
 
 ---
 

@@ -4,4 +4,3 @@
 ### New Rules
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
-SMB005 | Usage | Error | UseNameofInsteadOfString
