@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# C# Project Workflow
+
+When working with C# projects, always follow these guidelines:
+
+- **Code Formatting and Linting**:
+  - Run `dotnet format` to automatically format code and resolve basic linting issues.
+
+- **Building the Project**:
+  - Execute `dotnet build` to ensure the project compiles without errors.
+
+- **Running Tests (if available)**:
+  - Run `dotnet test` to verify that the project functions correctly and tests pass successfully.
+
+- **Additional Recommendations**:
+  - Utilize Roslyn analyzers and SecurityCodeScan for static code analysis and security auditing.

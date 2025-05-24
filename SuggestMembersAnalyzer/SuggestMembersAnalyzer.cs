@@ -137,8 +137,26 @@ namespace SuggestMembersAnalyzer.Analyzers
             List<(string Name, ISymbol Symbol)> entries)
         {
             var compilation = model.Compilation;
+            var context = new Utils.ExtensionMethodContext(receiverType, compilation, seenNames, entries);
 
-            // --- 1) Fast path: symbols that LookupSymbols already makes visible ---
+            // 1) Fast path: symbols that LookupSymbols already makes visible
+            AddLookupExtensionMethods(model, position, context);
+
+            // 2) Walk each namespace imported via using-directive
+            AddUsingNamespaceExtensionMethods(model, context);
+        }
+
+        /// <summary>
+        /// Adds extension methods found through LookupSymbols.
+        /// </summary>
+        /// <param name="model">The semantic model for symbol resolution.</param>
+        /// <param name="position">The position in syntax tree for scope resolution.</param>
+        /// <param name="context">The extension method discovery context.</param>
+        private static void AddLookupExtensionMethods(
+            SemanticModel model,
+            int position,
+            ExtensionMethodContext context)
+        {
             foreach (var method in model
                          .LookupSymbols(
                              position,
@@ -147,10 +165,19 @@ namespace SuggestMembersAnalyzer.Analyzers
                              includeReducedExtensionMethods: true)
                          .OfType<IMethodSymbol>())
             {
-                TryAdd(method);
+                context.TryAdd(method);
             }
+        }
 
-            // --- 2) Walk each namespace imported via using-directive ----------
+        /// <summary>
+        /// Adds extension methods from namespaces imported via using directives.
+        /// </summary>
+        /// <param name="model">The semantic model for symbol resolution.</param>
+        /// <param name="context">The extension method discovery context.</param>
+        private static void AddUsingNamespaceExtensionMethods(
+            SemanticModel model,
+            ExtensionMethodContext context)
+        {
             var root = model.SyntaxTree.GetRoot(CancellationToken.None);
             var nsUsings = root
                 .DescendantNodes()
@@ -160,96 +187,51 @@ namespace SuggestMembersAnalyzer.Analyzers
 
             foreach (var u in nsUsings)
             {
-                if (model.GetSymbolInfo(u.Name!).Symbol is not INamespaceSymbol nsSymbol)
+                if (model.GetSymbolInfo(u.Name!).Symbol is INamespaceSymbol nsSymbol)
                 {
-                    continue;
-                }
-
-                // DFS: push namespace and nested static types
-                var stack = new Stack<INamespaceOrTypeSymbol>();
-                stack.Push(nsSymbol);
-
-                while (stack.Count > 0)
-                {
-                    var current = stack.Pop();
-
-                    switch (current)
-                    {
-                        case INamespaceSymbol childNs:
-                            // enqueue nested namespaces and types
-                            foreach (var member in childNs.GetMembers())
-                            {
-                                stack.Push(member);
-                            }
-
-                            break;
-
-                        case INamedTypeSymbol type when type.IsStatic:
-                            // inspect each method in static type
-                            foreach (var m in type.GetMembers().OfType<IMethodSymbol>())
-                            {
-                                TryAdd(m);
-                            }
-
-                            break;
-
-                        default:
-                            // ignore non-namespace, non-static types
-                            break;
-                    }
+                    ProcessNamespaceForExtensions(nsSymbol, context);
                 }
             }
+        }
 
-            // --- local helper ----------------------------------------------------
-            void TryAdd(IMethodSymbol m)
+        /// <summary>
+        /// Processes a namespace to find extension methods using DFS.
+        /// </summary>
+        /// <param name="rootNamespace">The namespace to process for extension methods.</param>
+        /// <param name="context">The extension method discovery context.</param>
+        private static void ProcessNamespaceForExtensions(
+            INamespaceSymbol rootNamespace,
+            ExtensionMethodContext context)
+        {
+            var stack = new Stack<INamespaceOrTypeSymbol>();
+            stack.Push(rootNamespace);
+
+            while (stack.Count > 0)
             {
-                IMethodSymbol? candidate;
+                var current = stack.Pop();
 
-                if (m.MethodKind == MethodKind.ReducedExtension)
+                switch (current)
                 {
-                    candidate = m;
-                }
-                else if (m.IsExtensionMethod)
-                {
-                    candidate = BindExtension(m);
-                }
-                else
-                {
-                    candidate = null;
-                }
+                    case INamespaceSymbol childNs:
+                        foreach (var member in childNs.GetMembers())
+                        {
+                            stack.Push(member);
+                        }
 
-                if (candidate is null)
-                {
-                    return;  // skip if not applicable
+                        break;
+
+                    case INamedTypeSymbol type when type.IsStatic:
+                        foreach (var m in type.GetMembers().OfType<IMethodSymbol>())
+                        {
+                            context.TryAdd(m);
+                        }
+
+                        break;
+
+                    default:
+                        // Ignore non-namespace, non-static types
+                        break;
                 }
-
-                if (!seenNames.Add(candidate.Name))
-                {
-                    return;  // skip duplicates
-                }
-
-                entries.Add((candidate.Name, candidate));
-            }
-
-            // Attempt to bind generic parameters, or fall back to conversion
-            IMethodSymbol? BindExtension(IMethodSymbol ext)
-            {
-                // 1) Try Roslyn's inference
-                var reduced = ext.ReduceExtensionMethod(receiverType);
-                if (reduced is not null)
-                {
-                    return reduced;
-                }
-
-                // 2) Fallback: ensure receiverType → thisParam is convertible
-                if (ext.Parameters.Length == 0)
-                {
-                    return null;
-                }
-
-                var thisParam = ext.Parameters[0].Type;
-                var conv = compilation.ClassifyConversion(receiverType, thisParam);
-                return (conv.Exists && !conv.IsExplicit) ? ext : null;
             }
         }
 
@@ -274,6 +256,56 @@ namespace SuggestMembersAnalyzer.Analyzers
             ExpressionSyntax? targetExpression = null)
         {
             // 1) Resolve syntax nodes if not provided
+            if (!TryResolveMemberAccess(ctx, ref memberNameSyntax, ref targetExpression))
+            {
+                return;
+            }
+
+            // Extract the unknown identifier and validate symbol info
+            string missing = memberNameSyntax!.Identifier.ValueText;
+            var model = ctx.SemanticModel;
+
+            if (ShouldSkipMemberAccess(model, memberNameSyntax))
+            {
+                return;
+            }
+
+            // 3) Determine compile-time type of the target expression
+            var exprType = GetTargetExpressionType(model, targetExpression!);
+            if (exprType is null)
+            {
+                return;
+            }
+
+            // 4) Collect members and find suggestions
+            var entries = CollectMemberCandidates(exprType, restrictToFieldsAndProps, out var seen);
+
+            // 5) Add extension methods if allowed
+            if (!restrictToFieldsAndProps)
+            {
+                AddVisibleExtensionMethods(exprType, model, memberNameSyntax.SpanStart, seen, entries);
+            }
+
+            // 6) Find similar symbols and report diagnostic
+            var similar = Utils.StringSimilarity.FindSimilarSymbols(missing, entries);
+            if (similar.Count > 0)
+            {
+                ReportMemberAccessDiagnostic(ctx, memberNameSyntax, missing, exprType, similar);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to resolve member access syntax nodes from the analysis context.
+        /// </summary>
+        /// <param name="ctx">The analysis context.</param>
+        /// <param name="memberNameSyntax">The member name syntax to resolve.</param>
+        /// <param name="targetExpression">The target expression syntax to resolve.</param>
+        /// <returns>True if both syntax nodes were successfully resolved.</returns>
+        private static bool TryResolveMemberAccess(
+            SyntaxNodeAnalysisContext ctx,
+            ref SimpleNameSyntax? memberNameSyntax,
+            ref ExpressionSyntax? targetExpression)
+        {
             if (memberNameSyntax is null || targetExpression is null)
             {
                 if (ctx.Node is MemberAccessExpressionSyntax ma && ma.Parent is not AttributeSyntax)
@@ -289,27 +321,33 @@ namespace SuggestMembersAnalyzer.Analyzers
                 }
             }
 
-            if (memberNameSyntax is null || targetExpression is null)
-            {
-                return;
-            }
+            return memberNameSyntax is not null && targetExpression is not null;
+        }
 
-            // Extract the unknown identifier
-            string missing = memberNameSyntax.Identifier.ValueText;
-            var model = ctx.SemanticModel;
-
-            // 2) If symbol exists or overload candidates exist → bail out
+        /// <summary>
+        /// Determines if member access analysis should be skipped.
+        /// </summary>
+        /// <param name="model">The semantic model.</param>
+        /// <param name="memberNameSyntax">The member name syntax to check.</param>
+        /// <returns>True if analysis should be skipped.</returns>
+        private static bool ShouldSkipMemberAccess(SemanticModel model, SimpleNameSyntax memberNameSyntax)
+        {
             var symInfo = model.GetSymbolInfo(memberNameSyntax);
-            if (symInfo.Symbol != null
+            return symInfo.Symbol != null
                 || symInfo.CandidateReason == CandidateReason.OverloadResolutionFailure
-                || symInfo.CandidateSymbols.Any(s => s.Kind == SymbolKind.Method))
-            {
-                return;
-            }
+                || symInfo.CandidateSymbols.Any(s => s.Kind == SymbolKind.Method);
+        }
 
-            // 3) Determine compile-time type of the target expression
+        /// <summary>
+        /// Gets the type of the target expression for member access.
+        /// </summary>
+        /// <param name="model">The semantic model.</param>
+        /// <param name="targetExpression">The target expression to analyze.</param>
+        /// <returns>The type symbol of the target expression, or null if not resolvable.</returns>
+        private static ITypeSymbol? GetTargetExpressionType(SemanticModel model, ExpressionSyntax targetExpression)
+        {
             var tInfo = model.GetTypeInfo(targetExpression);
-            var exprType = tInfo.Type ?? tInfo.ConvertedType
+            return tInfo.Type ?? tInfo.ConvertedType
                          ?? model.GetSymbolInfo(targetExpression).Symbol switch
                          {
                              ILocalSymbol loc => loc.Type,
@@ -319,81 +357,111 @@ namespace SuggestMembersAnalyzer.Analyzers
                              IMethodSymbol mth => mth.ReturnType,
                              _ => null
                          };
-            if (exprType is null)
-            {
-                return;
-            }
+        }
 
-            // 4) Collect instance members (fields, props, methods)
+        /// <summary>
+        /// Collects member candidates from the target type and its hierarchy.
+        /// </summary>
+        /// <param name="exprType">The expression type to collect members from.</param>
+        /// <param name="restrictToFieldsAndProps">Whether to restrict to fields and properties only.</param>
+        /// <param name="seen">Output parameter for tracking seen member names.</param>
+        /// <returns>List of member candidates.</returns>
+        private static List<(string Name, ISymbol Symbol)> CollectMemberCandidates(
+            ITypeSymbol exprType,
+            bool restrictToFieldsAndProps,
+            out HashSet<string> seen)
+        {
             var entries = new List<(string Name, ISymbol Symbol)>();
-            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var seenNames = new HashSet<string>(StringComparer.Ordinal);
 
-            void Add(ISymbol sym)
+            CollectMembersRecursive(exprType, entries, seenNames, restrictToFieldsAndProps);
+
+            seen = seenNames;
+            return entries;
+        }
+
+        /// <summary>
+        /// Recursively collects members from a type and its base types/interfaces.
+        /// </summary>
+        /// <param name="type">The type to collect members from.</param>
+        /// <param name="entries">The list to add entries to.</param>
+        /// <param name="seenNames">Set of already seen member names.</param>
+        /// <param name="restrictToFieldsAndProps">Whether to restrict to fields and properties only.</param>
+        private static void CollectMembersRecursive(
+            ITypeSymbol type,
+            List<(string Name, ISymbol Symbol)> entries,
+            HashSet<string> seenNames,
+            bool restrictToFieldsAndProps)
+        {
+            foreach (var mem in type.GetMembers())
             {
-                if (sym.IsImplicitlyDeclared
-                    || sym.Name.StartsWith("get_", StringComparison.Ordinal)
-                    || sym.Name.StartsWith("set_", StringComparison.Ordinal)
-                    || !seen.Add(sym.Name))
-                {
-                    return;
-                }
-
-                if (restrictToFieldsAndProps
-                    && sym.Kind is not(SymbolKind.Field or SymbolKind.Property))
-                {
-                    return;
-                }
-
-                entries.Add((sym.Name, sym));
+                AddMemberIfValid(mem, entries, seenNames, restrictToFieldsAndProps);
             }
 
-            void Collect(ITypeSymbol type)
+            foreach (var iface in type.AllInterfaces)
             {
-                foreach (var mem in type.GetMembers())
+                foreach (var mem in iface.GetMembers())
                 {
-                    Add(mem);
-                }
-
-                foreach (var iface in type.AllInterfaces)
-                {
-                    foreach (var mem in iface.GetMembers())
-                    {
-                        Add(mem);
-                    }
-                }
-
-                if (type.BaseType is not null)
-                {
-                    Collect(type.BaseType);
+                    AddMemberIfValid(mem, entries, seenNames, restrictToFieldsAndProps);
                 }
             }
 
-            Collect(exprType);
-
-            // 5) Add extension methods if allowed
-            if (!restrictToFieldsAndProps)
+            if (type.BaseType is not null)
             {
-                AddVisibleExtensionMethods(
-                    receiverType: exprType,
-                    model: model,
-                    position: memberNameSyntax.SpanStart,
-                    seenNames: seen,
-                    entries: entries);
+                CollectMembersRecursive(type.BaseType, entries, seenNames, restrictToFieldsAndProps);
             }
+        }
 
-            // 6) Find up to five closest matches
-            var similar = Utils.StringSimilarity.FindSimilarSymbols(missing, entries);
-            if (similar.Count == 0)
+        /// <summary>
+        /// Adds a member to the entries list if it passes validation.
+        /// </summary>
+        /// <param name="sym">The symbol to validate and add.</param>
+        /// <param name="entries">The list to add the entry to.</param>
+        /// <param name="seenNames">Set of already seen member names.</param>
+        /// <param name="restrictToFieldsAndProps">Whether to restrict to fields and properties only.</param>
+        private static void AddMemberIfValid(
+            ISymbol sym,
+            List<(string Name, ISymbol Symbol)> entries,
+            HashSet<string> seenNames,
+            bool restrictToFieldsAndProps)
+        {
+            if (sym.IsImplicitlyDeclared
+                || sym.Name.StartsWith("get_", StringComparison.Ordinal)
+                || sym.Name.StartsWith("set_", StringComparison.Ordinal)
+                || !seenNames.Add(sym.Name))
             {
                 return;
             }
 
-            // 7) Format the suggestions and report diagnostic
+            if (restrictToFieldsAndProps
+                && sym.Kind is not(SymbolKind.Field or SymbolKind.Property))
+            {
+                return;
+            }
+
+            entries.Add((sym.Name, sym));
+        }
+
+        /// <summary>
+        /// Reports a member access diagnostic with suggestions.
+        /// </summary>
+        /// <param name="ctx">The analysis context.</param>
+        /// <param name="memberNameSyntax">The member name syntax with the error.</param>
+        /// <param name="missing">The missing member name.</param>
+        /// <param name="exprType">The target expression type.</param>
+        /// <param name="similar">The similar symbol suggestions.</param>
+        private static void ReportMemberAccessDiagnostic(
+            SyntaxNodeAnalysisContext ctx,
+            SimpleNameSyntax memberNameSyntax,
+            string missing,
+            ITypeSymbol exprType,
+            IReadOnlyList<(string Name, ISymbol Value, double Score)> similar)
+        {
             var lines = similar
                 .Select(r => SymbolFormatter.GetFormattedMemberRepresentation(r.Value, includeSignature: true))
                 .ToList();
 
-            var props = new Dictionary<string, string?>
+            var props = new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Suggestions"] = string.Join("|", similar.Select(r => r.Name)),
             }.ToImmutableDictionary();

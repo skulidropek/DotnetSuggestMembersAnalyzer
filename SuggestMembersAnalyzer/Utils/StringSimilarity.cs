@@ -17,6 +17,16 @@ namespace SuggestMembersAnalyzer.Utils
     internal static class StringSimilarity
     {
         /// <summary>
+        /// Compiled regex for splitting identifiers by camelCase, underscores, spaces, or digits.
+        /// </summary>
+        private static readonly Regex SplitRegex = new Regex(@"(?=[A-Z])|[_\s\d]", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+
+        /// <summary>
+        /// Compiled regex for normalizing strings by removing underscores and spaces.
+        /// </summary>
+        private static readonly Regex NormalizeRegex = new Regex(@"[_\s]", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+
+        /// <summary>
         /// Computes Jaro similarity between two strings.
         /// </summary>
         /// <param name="s1">First string.</param>
@@ -24,7 +34,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Jaro similarity score between 0.0 and 1.0.</returns>
         internal static double Jaro(string s1, string s2)
         {
-            if (s1 == s2)
+            if (string.Equals(s1, s2, StringComparison.Ordinal))
             {
                 return 1.0;
             }
@@ -38,67 +48,16 @@ namespace SuggestMembersAnalyzer.Utils
             }
 
             int matchDistance = (int)Math.Floor(Math.Max(len1, len2) / 2.0) - 1;
-            bool[] s1Matches = new bool[len1];
-            bool[] s2Matches = new bool[len2];
-            int matches = 0;
-            int transpositions = 0;
+            var matchData = JaroSimilarityHelper.FindMatches(s1, s2, matchDistance);
 
-            for (int i = 0; i < len1; i++)
-            {
-                int start = Math.Max(0, i - matchDistance);
-                int end = Math.Min(i + matchDistance + 1, len2);
-
-                for (int j = start; j < end; j++)
-                {
-                    if (s2Matches[j])
-                    {
-                        continue;
-                    }
-
-                    if (s1[i] != s2[j])
-                    {
-                        continue;
-                    }
-
-                    s1Matches[i] = true;
-                    s2Matches[j] = true;
-                    matches++;
-                    break;
-                }
-            }
-
-            if (matches == 0)
+            if (matchData.matches == 0)
             {
                 return 0.0;
             }
 
-            int k = 0;
-            for (int i = 0; i < len1; i++)
-            {
-                if (!s1Matches[i])
-                {
-                    continue;
-                }
+            int transpositions = JaroSimilarityHelper.CountTranspositions(s1, s2, matchData.s1Matches, matchData.s2Matches);
 
-                while (!s2Matches[k])
-                {
-                    k++;
-                }
-
-                if (s1[i] != s2[k])
-                {
-                    transpositions++;
-                }
-
-                k++;
-            }
-
-            transpositions /= 2;
-
-            return (
-                ((double)matches / len1) +
-                ((double)matches / len2) +
-                (((double)matches - transpositions) / matches)) / 3.0;
+            return JaroSimilarityHelper.CalculateJaroScore(matchData.matches, transpositions, len1, len2);
         }
 
         /// <summary>
@@ -136,7 +95,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Array of lowercase tokens.</returns>
         internal static string[] SplitIdentifier(string identifier)
         {
-            return Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
+            return SplitRegex.Split(identifier)
                 .Select(static s => s.ToLowerInvariant())
                 .Where(static s => !string.IsNullOrEmpty(s))
                 .ToArray();
@@ -149,7 +108,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Normalized string.</returns>
         internal static string Normalize(string str)
         {
-            return Regex.Replace(str.ToLowerInvariant(), @"[_\s]", string.Empty);
+            return NormalizeRegex.Replace(str.ToLowerInvariant(), string.Empty);
         }
 
         /// <summary>
@@ -167,15 +126,15 @@ namespace SuggestMembersAnalyzer.Utils
             double baseSimilarity = JaroWinkler(normQuery, normCandidate);
 
             // Exact match bonus
-            double exactBonus = (normQuery == normCandidate) ? 0.3 : 0.0;
+            double exactBonus = string.Equals(normQuery, normCandidate, StringComparison.Ordinal) ? 0.3 : 0.0;
 
             // Containment bonus
             bool contains = normCandidate.Contains(normQuery) || normQuery.Contains(normCandidate);
             double containmentBonus = contains ? 0.2 : 0.0;
 
             // Token bonus
-            var tokensQuery = new HashSet<string>(SplitIdentifier(unknown));
-            var tokensCandidate = new HashSet<string>(SplitIdentifier(candidate));
+            var tokensQuery = new HashSet<string>(SplitIdentifier(unknown), StringComparer.Ordinal);
+            var tokensCandidate = new HashSet<string>(SplitIdentifier(candidate), StringComparer.Ordinal);
             double tokenBonus = 0.0;
             int tokensMatched = 0;
 
@@ -183,7 +142,7 @@ namespace SuggestMembersAnalyzer.Utils
             {
                 foreach (var tc in tokensCandidate)
                 {
-                    if (tq == tc)
+                    if (string.Equals(tq, tc, StringComparison.Ordinal))
                     {
                         tokenBonus += 0.2;
                         tokensMatched++;
@@ -218,66 +177,15 @@ namespace SuggestMembersAnalyzer.Utils
         {
             const double MinScore = 0.3;
 
-            var result = new List<(string name, string displayName, double score)>();
-
-            // Process all members of the object type
-            foreach (var member in objectType.GetMembers())
-            {
-                try
-                {
-                    string displayName = member.Name;
-
-                    // Check if it's a method or property
-                    if (member is IMethodSymbol methodSymbol)
-                    {
-                        // For methods, add its signature
-                        var parameters = methodSymbol.Parameters
-                            .Select(static p => $"{p.Name}: {p.Type}")
-                            .ToList();
-
-                        string paramString = string.Join(", ", parameters);
-                        string returnType = methodSymbol.ReturnType.ToString();
-
-                        displayName = $"{member.Name}({paramString})";
-                        if (returnType != "void")
-                        {
-                            displayName += $": {returnType}";
-                        }
-                    }
-                    else if (member is IPropertySymbol propertySymbol)
-                    {
-                        // For properties, add its type
-                        displayName = $"{member.Name}: {propertySymbol.Type}";
-                    }
-                    else if (member is IFieldSymbol fieldSymbol)
-                    {
-                        // For fields, add its type
-                        displayName = $"{member.Name}: {fieldSymbol.Type}";
-                    }
-
-                    // Calculate similarity with requested name
-                    double score = ComputeCompositeScore(requestedName, member.Name);
-
-                    result.Add((member.Name, displayName, score));
-                }
-                catch (Exception ex)
-                {
-                    // Log detailed error information for SuggestMembersAnalyzer
-                    System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] StringSimilarity.GetFormattedMembersList failed processing member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
-
-                    // In case of error, add just the member name
-                    double score = ComputeCompositeScore(requestedName, member.Name);
-                    result.Add((member.Name, member.Name, score));
-                }
-            }
-
-            // Sort by similarity and take only top 5 items with scores above threshold
-            return result
+            var result = objectType.GetMembers()
+                .Select(member => MemberDisplayFormatter.FormatMember(member, requestedName, objectType))
                 .Where(static item => item.score >= MinScore)
                 .OrderByDescending(static item => item.score)
                 .Take(5)
                 .Select(static item => item.displayName)
                 .ToList();
+
+            return result;
         }
 
         /// <summary>
@@ -342,7 +250,7 @@ namespace SuggestMembersAnalyzer.Utils
                     Score: ComputeCompositeScore(queryName, entry.Key)))
                 .Where(item => !string.IsNullOrEmpty(item.Name) &&
                        item.Score >= MIN_SCORE &&
-                       item.Name != queryName) // Exclude exact matches to the query, as these likely don't exist
+                       !string.Equals(item.Name, queryName, StringComparison.Ordinal)) // Exclude exact matches to the query, as these likely don't exist
                 .OrderByDescending(r => r.Score)
                 .Take(5)
                 .ToList();

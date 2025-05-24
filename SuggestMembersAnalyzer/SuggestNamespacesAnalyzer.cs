@@ -115,7 +115,7 @@ namespace SuggestMembersAnalyzer
                 }
             }
 
-            allNamespaces = builder.Distinct().ToImmutableArray();
+            allNamespaces = builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
             return allNamespaces;
         }
 

@@ -103,7 +103,36 @@ namespace SuggestMembersAnalyzer
 
             var name = id.Identifier.ValueText;
 
-            // 1. Quick filters — cheap checks first
+            // Quick filters and validation
+            if (ShouldSkipIdentifier(id, name, context.SemanticModel))
+            {
+                return;
+            }
+
+            // Check if we should analyze this identifier
+            if (!ShouldAnalyzeForSuggestions(id, name, context.SemanticModel))
+            {
+                return;
+            }
+
+            // Generate and report suggestions
+            var suggestions = GatherSymbolSuggestions(id, name, context.SemanticModel, allTypeNames);
+            if (suggestions.Count > 0)
+            {
+                ReportSuggestionDiagnostic(context, id, name, suggestions);
+            }
+        }
+
+        /// <summary>
+        /// Determines if an identifier should be skipped from analysis.
+        /// </summary>
+        /// <param name="id">The identifier syntax.</param>
+        /// <param name="name">The identifier name.</param>
+        /// <param name="model">The semantic model.</param>
+        /// <returns>True if the identifier should be skipped.</returns>
+        private static bool ShouldSkipIdentifier(IdentifierNameSyntax id, string name, SemanticModel model)
+        {
+            // Quick filters — cheap checks first
             if (Keywords.Contains(name) ||
                 id.Parent is NameColonSyntax || // named arguments
                 id.Parent is VariableDeclaratorSyntax || // declarations
@@ -113,44 +142,70 @@ namespace SuggestMembersAnalyzer
                 IsInXmlComment(id) ||
                 IsNameOfOperand(id))
             {
-                return;
+                return true;
             }
 
-            var model = context.SemanticModel;
             var info = model.GetSymbolInfo(id);
 
             // Already resolved or only overload mismatch – nothing to do
             if (info.Symbol is not null ||
                 info.CandidateReason == CandidateReason.OverloadResolutionFailure)
             {
-                return;
+                return true;
             }
 
             // Skip LINQ clauses / anonymous initializers
             if (id.Ancestors().Any(a => a is QueryExpressionSyntax or AnonymousObjectMemberDeclaratorSyntax))
             {
-                return;
+                return true;
             }
 
-            // 2. Check compiler diagnostics for «name/type not found»
-            if (!HasRelevantCompilerError(model, id) && !IsTypePosition(id))
+            return false;
+        }
+
+        /// <summary>
+        /// Determines if an identifier should be analyzed for suggestions.
+        /// </summary>
+        /// <param name="id">The identifier syntax.</param>
+        /// <param name="name">The identifier name.</param>
+        /// <param name="model">The semantic model.</param>
+        /// <returns>True if the identifier should be analyzed.</returns>
+        private static bool ShouldAnalyzeForSuggestions(IdentifierNameSyntax id, string name, SemanticModel model)
+        {
+            // Check compiler diagnostics for «name/type not found»
+            if (HasRelevantCompilerError(model, id) || IsTypePosition(id))
             {
-                // Extra heuristic: ignore if identifier clearly unrelated to a known type
-                var looksLikeType =
-                    model.LookupSymbols(id.SpanStart)
-                         .OfType<INamedTypeSymbol>()
-                         .Any(sym => StringSimilarity.ComputeCompositeScore(name, sym.Name) > 0.7);
-                if (!looksLikeType)
-                {
-                    return;
-                }
+                return true;
             }
 
-            // 3. Gather locals/fields/props + project type names
+            // Extra heuristic: ignore if identifier clearly unrelated to a known type
+            var looksLikeType =
+                model.LookupSymbols(id.SpanStart)
+                     .OfType<INamedTypeSymbol>()
+                     .Any(sym => StringSimilarity.ComputeCompositeScore(name, sym.Name) > 0.7);
+
+            return looksLikeType;
+        }
+
+        /// <summary>
+        /// Gathers symbol suggestions for an identifier.
+        /// </summary>
+        /// <param name="id">The identifier syntax.</param>
+        /// <param name="name">The identifier name.</param>
+        /// <param name="model">The semantic model.</param>
+        /// <param name="allTypeNames">All available type names.</param>
+        /// <returns>List of suggested symbols.</returns>
+        private static List<object> GatherSymbolSuggestions(
+            IdentifierNameSyntax id,
+            string name,
+            SemanticModel model,
+            ImmutableArray<string> allTypeNames)
+        {
+            // Gather locals/fields/props + project type names
             var visibleSymbols = model.LookupSymbols(id.SpanStart)
-                                       .Where(s => s.Kind is SymbolKind.Local or SymbolKind.Parameter or
-                                                   SymbolKind.Field or SymbolKind.Property or SymbolKind.Method)
-                                       .Select(s => (Key: s.Name, Value: (object)s));
+                                      .Where(s => s.Kind is SymbolKind.Local or SymbolKind.Parameter or
+                                                  SymbolKind.Field or SymbolKind.Property or SymbolKind.Method)
+                                      .Select(s => (Key: s.Name, Value: (object)s));
 
             var typeEntries = allTypeNames.Select(full =>
             {
@@ -159,16 +214,26 @@ namespace SuggestMembersAnalyzer
                 return (Key: shortName, Value: (object)full);
             });
 
-            var suggestions = StringSimilarity
+            return StringSimilarity
                 .FindSimilarSymbols(name, visibleSymbols.Concat(typeEntries))
                 .Select(r => r.Value)
+                .Where(v => v != null)
                 .ToList();
+        }
 
-            if (suggestions.Count == 0 || suggestions[0] == null)
-            {
-                return;
-            }
-
+        /// <summary>
+        /// Reports a suggestion diagnostic for an identifier.
+        /// </summary>
+        /// <param name="context">The analysis context.</param>
+        /// <param name="id">The identifier syntax.</param>
+        /// <param name="name">The identifier name.</param>
+        /// <param name="suggestions">The list of suggestions.</param>
+        private static void ReportSuggestionDiagnostic(
+            SyntaxNodeAnalysisContext context,
+            IdentifierNameSyntax id,
+            string name,
+            List<object> suggestions)
+        {
             var entityKind = SymbolFormatter.GetEntityKind(suggestions[0]);
             var suggestionText = "\n- " + string.Join("\n- ", suggestions.Select(s => s != null ? SymbolFormatter.FormatAny(s) : string.Empty));
 

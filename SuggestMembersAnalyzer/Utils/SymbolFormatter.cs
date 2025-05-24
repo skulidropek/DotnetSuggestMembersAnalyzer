@@ -96,62 +96,15 @@ namespace SuggestMembersAnalyzer.Utils
         {
             try
             {
-                // --- process getters and setters as properties ---
-                if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_"))
+                // Handle property accessors (getters and setters)
+                var propertySignature = TryFormatAsPropertyAccessor(method);
+                if (propertySignature != null)
                 {
-                    var name = method.Name.Substring(4);
-                    var prop = method.ContainingType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
-                    return prop != null
-                        ? GetPropertySignature(prop)
-                        : $"{GetFormattedTypeName(method.ReturnType)} {name} {{ get; }}";
+                    return propertySignature;
                 }
 
-                if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_"))
-                {
-                    var name = method.Name.Substring(4);
-                    var prop = method.ContainingType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
-                    if (prop != null)
-                    {
-                        return GetPropertySignature(prop);
-                    }
-
-                    var pType = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
-                    return $"{GetFormattedTypeName(pType)} {name} {{ set; }}";
-                }
-
-                // --- regular method ---
-                var sb = new StringBuilder();
-                sb.Append(GetFormattedTypeName(method.ReturnType)).Append(' ');
-
-                if (method.IsExtensionMethod || method.MethodKind == MethodKind.ReducedExtension)
-                {
-                    sb.Append(method.ContainingType.ToDisplayString()).Append('.');
-                }
-
-                sb.Append(method.Name);
-
-                if (method.IsGenericMethod && method.TypeParameters.Length > 0)
-                {
-                    sb.Append('<')
-                    .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
-                    .Append('>');
-                }
-
-                sb.Append('(')
-                .Append(string.Join(", ", method.Parameters.Select(p =>
-                {
-                    var mod = p.RefKind switch
-                    {
-                        RefKind.Ref => "ref ",
-                        RefKind.Out => "out ",
-                        RefKind.In => "in ",
-                        _ => string.Empty
-                    };
-                    return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
-                })))
-                .Append(')');
-
-                return sb.ToString();
+                // Format as regular method
+                return FormatRegularMethodSignature(method);
             }
             catch (Exception ex)
             {
@@ -259,6 +212,93 @@ namespace SuggestMembersAnalyzer.Utils
                 .WithGenericsOptions(SymbolDisplayGenericsOptions.IncludeTypeParameters);
 
             return type.ToDisplayString(fmt);
+        }
+
+        /// <summary>
+        /// Tries to format a method as a property accessor (getter/setter).
+        /// </summary>
+        /// <param name="method">The method to check.</param>
+        /// <returns>Property signature if it's an accessor, null otherwise.</returns>
+        private static string? TryFormatAsPropertyAccessor(IMethodSymbol method)
+        {
+            if (method.MethodKind == MethodKind.PropertyGet && method.Name.StartsWith("get_", StringComparison.Ordinal))
+            {
+                var name = method.Name.Substring(4);
+                var prop = method.ContainingType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
+                return prop != null
+                    ? GetPropertySignature(prop)
+                    : $"{GetFormattedTypeName(method.ReturnType)} {name} {{ get; }}";
+            }
+
+            if (method.MethodKind == MethodKind.PropertySet && method.Name.StartsWith("set_", StringComparison.Ordinal))
+            {
+                var name = method.Name.Substring(4);
+                var prop = method.ContainingType.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
+                if (prop != null)
+                {
+                    return GetPropertySignature(prop);
+                }
+
+                var pType = method.Parameters.FirstOrDefault()?.Type ?? method.ContainingType;
+                return $"{GetFormattedTypeName(pType)} {name} {{ set; }}";
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Formats a regular method signature.
+        /// </summary>
+        /// <param name="method">The method to format.</param>
+        /// <returns>Formatted method signature.</returns>
+        private static string FormatRegularMethodSignature(IMethodSymbol method)
+        {
+            var sb = new StringBuilder();
+
+            // Return type
+            sb.Append(GetFormattedTypeName(method.ReturnType)).Append(' ');
+
+            // Extension method prefix
+            if (method.IsExtensionMethod || method.MethodKind == MethodKind.ReducedExtension)
+            {
+                sb.Append(method.ContainingType.ToDisplayString()).Append('.');
+            }
+
+            // Method name
+            sb.Append(method.Name);
+
+            // Generic type parameters
+            if (method.IsGenericMethod && method.TypeParameters.Length > 0)
+            {
+                sb.Append('<')
+                  .Append(string.Join(", ", method.TypeParameters.Select(tp => tp.Name)))
+                  .Append('>');
+            }
+
+            // Parameters
+            sb.Append('(').Append(FormatMethodParameters(method)).Append(')');
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Formats method parameters for signature display.
+        /// </summary>
+        /// <param name="method">The method whose parameters to format.</param>
+        /// <returns>Formatted parameters string.</returns>
+        private static string FormatMethodParameters(IMethodSymbol method)
+        {
+            return string.Join(", ", method.Parameters.Select(p =>
+            {
+                var mod = p.RefKind switch
+                {
+                    RefKind.Ref => "ref ",
+                    RefKind.Out => "out ",
+                    RefKind.In => "in ",
+                    _ => string.Empty
+                };
+                return $"{mod}{GetFormattedTypeName(p.Type)} {p.Name}";
+            }));
         }
 
         /// <summary>
@@ -370,7 +410,7 @@ namespace SuggestMembersAnalyzer.Utils
         //  Helper predicates
         // ------------------------------------------------------------------
         private static bool IsAttributeType(ITypeSymbol t) =>
-            t?.BaseType?.ToDisplayString() == "System.Attribute";
+            string.Equals(t?.BaseType?.ToDisplayString(), "System.Attribute", StringComparison.Ordinal);
 
         private static bool IsAttributeCtor(IMethodSymbol m) =>
             m.MethodKind == MethodKind.Constructor && IsAttributeType(m.ContainingType);
