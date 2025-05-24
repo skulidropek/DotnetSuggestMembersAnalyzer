@@ -32,7 +32,9 @@ namespace SuggestMembersAnalyzer.Utils
             catch (Exception ex)
             {
                 // Log detailed error information for SuggestMembersAnalyzer
-                System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
+                    $"member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
 
                 // In case of error, add just the member name
                 double score = StringSimilarity.ComputeCompositeScore(requestedName, member.Name);
