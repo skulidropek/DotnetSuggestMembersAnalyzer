@@ -22,13 +22,13 @@ namespace SuggestMembersAnalyzer.Utils
         /// Call this at the beginning of analysis to enable enhanced attribute formatting.
         /// </summary>
         /// <param name="compilation">The compilation context to use.</param>
-        public static void Initialize(Compilation compilation)
+        internal static void Initialize(Compilation compilation)
         {
             currentCompilation = compilation;
         }
 
         // ------------------------------------------------------------------
-        //  Main public helpers
+        //  Main internal helpers
         // ------------------------------------------------------------------
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="entry">The entry to format (ISymbol or string).</param>
         /// <returns>Formatted string with kind prefix.</returns>
-        public static string FormatAny(object entry) => entry switch
+        internal static string FormatAny(object entry) => entry switch
         {
             ISymbol sym => FormatSymbol(sym),
             string s when s.EndsWith(AttributeSuffix, StringComparison.Ordinal)
@@ -50,7 +50,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="symbol">The symbol to format.</param>
         /// <returns>Formatted string with kind tag and signature.</returns>
-        public static string FormatSymbol(ISymbol symbol) => symbol switch
+        internal static string FormatSymbol(ISymbol symbol) => symbol switch
         {
             IMethodSymbol m when IsAttributeCtor(m) => FormatAttributeCtor(m),
             IMethodSymbol m => FormatMethod(m),
@@ -68,7 +68,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <summary>Returns a readable kind name for diagnostics.</summary>
         /// <param name="entry">The entry to get kind for.</param>
         /// <returns>Readable kind name.</returns>
-        public static string GetEntityKind(object entry) => entry switch
+        internal static string GetEntityKind(object entry) => entry switch
         {
             INamedTypeSymbol t when IsAttributeType(t) => "Attribute",
             IMethodSymbol m when IsAttributeCtor(m) => "Attribute",
@@ -92,7 +92,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="method">The method symbol to format.</param>
         /// <returns>Formatted method signature string.</returns>
-        public static string GetMethodSignature(this IMethodSymbol method)
+        internal static string GetMethodSignature(this IMethodSymbol method)
         {
             try
             {
@@ -168,7 +168,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="property">The property symbol to format.</param>
         /// <returns>Formatted property signature string.</returns>
-        public static string GetPropertySignature(this IPropertySymbol property)
+        internal static string GetPropertySignature(this IPropertySymbol property)
         {
             try
             {
@@ -226,7 +226,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="member">The symbol member to format.</param>
         /// <param name="includeSignature">Whether to include full signature or just name.</param>
         /// <returns>Formatted member representation.</returns>
-        public static string GetFormattedMemberRepresentation(this ISymbol member, bool includeSignature)
+        internal static string GetFormattedMemberRepresentation(this ISymbol member, bool includeSignature)
         {
             if (!includeSignature)
             {
@@ -247,7 +247,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="type">The type symbol to format.</param>
         /// <returns>Formatted type name string.</returns>
-        public static string GetFormattedTypeName(this ITypeSymbol type)
+        internal static string GetFormattedTypeName(this ITypeSymbol type)
         {
             if (type == null)
             {

@@ -29,15 +29,15 @@ namespace SuggestMembersAnalyzer
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
         private static readonly DiagnosticDescriptor NamespaceNotFoundRule = new DiagnosticDescriptor(
-            /* id */ NamespaceNotFoundDiagnosticId,
-            /* title */         Resources.NamespaceNotFoundTitle,
-            /* messageFormat */ Resources.NamespaceNotFoundMessageFormat,
-            /* category */      Category,
-            /* severity */      DiagnosticSeverity.Error,
-            /* isEnabled */     true,
-            /* description */   Resources.NamespaceNotFoundDescription,
-            /* helpLink */      HelpLinkUri,
-            /* customTags */    "AnalyzerReleaseTracking");
+            id: NamespaceNotFoundDiagnosticId,
+            title: Resources.NamespaceNotFoundTitle,
+            messageFormat: Resources.NamespaceNotFoundMessageFormat,
+            category: Category,
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: Resources.NamespaceNotFoundDescription,
+            helpLinkUri: HelpLinkUri,
+            customTags: "AnalyzerReleaseTracking");
 
         // Cache of all namespaces
         private static ImmutableArray<string> allNamespaces;

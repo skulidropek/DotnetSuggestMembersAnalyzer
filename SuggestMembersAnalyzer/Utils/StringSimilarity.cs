@@ -22,7 +22,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="s1">First string.</param>
         /// <param name="s2">Second string.</param>
         /// <returns>Jaro similarity score between 0.0 and 1.0.</returns>
-        public static double Jaro(string s1, string s2)
+        internal static double Jaro(string s1, string s2)
         {
             if (s1 == s2)
             {
@@ -107,7 +107,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="s1">First string.</param>
         /// <param name="s2">Second string.</param>
         /// <returns>Jaro-Winkler similarity score between 0.0 and 1.0.</returns>
-        public static double JaroWinkler(string s1, string s2)
+        internal static double JaroWinkler(string s1, string s2)
         {
             double jaroSim = Jaro(s1, s2);
 
@@ -134,7 +134,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="identifier">The identifier to split.</param>
         /// <returns>Array of lowercase tokens.</returns>
-        public static string[] SplitIdentifier(string identifier)
+        internal static string[] SplitIdentifier(string identifier)
         {
             return Regex.Split(identifier, @"(?=[A-Z])|[_\s\d]")
                 .Select(static s => s.ToLowerInvariant())
@@ -147,7 +147,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="str">String to normalize.</param>
         /// <returns>Normalized string.</returns>
-        public static string Normalize(string str)
+        internal static string Normalize(string str)
         {
             return Regex.Replace(str.ToLowerInvariant(), @"[_\s]", string.Empty);
         }
@@ -158,7 +158,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="unknown">The unknown query string.</param>
         /// <param name="candidate">The candidate string to compare against.</param>
         /// <returns>Composite similarity score.</returns>
-        public static double ComputeCompositeScore(string unknown, string candidate)
+        internal static double ComputeCompositeScore(string unknown, string candidate)
         {
             string normQuery = Normalize(unknown);
             string normCandidate = Normalize(candidate);
@@ -214,7 +214,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="objectType">The type to get members from.</param>
         /// <param name="requestedName">The name being searched for.</param>
         /// <returns>List of formatted member strings.</returns>
-        public static List<string> GetFormattedMembersList(ITypeSymbol objectType, string requestedName)
+        internal static List<string> GetFormattedMembersList(ITypeSymbol objectType, string requestedName)
         {
             const double MinScore = 0.3;
 
@@ -286,7 +286,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="requestedName">The name to search for.</param>
         /// <param name="moduleSymbol">The namespace symbol to search in.</param>
         /// <returns>List of matching exported symbols with scores.</returns>
-        public static List<(string name, double score)> FindPossibleExports(
+        internal static List<(string name, double score)> FindPossibleExports(
             string requestedName,
             INamespaceSymbol moduleSymbol)
         {
@@ -328,7 +328,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="queryName">The name being searched for.</param>
         /// <param name="candidateEntries">List of candidate entries with search key and display value.</param>
         /// <returns>List of matching items with scores.</returns>
-        public static List<(string Name, TValue Value, double Score)> FindSimilarSymbols<TValue>(
+        internal static List<(string Name, TValue Value, double Score)> FindSimilarSymbols<TValue>(
             string queryName,
             IEnumerable<(string Key, TValue Value)> candidateEntries)
         {
@@ -354,7 +354,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="queryName">The name being searched for.</param>
         /// <param name="candidateNames">Array of candidate names to search through.</param>
         /// <returns>List of matching names with similarity scores.</returns>
-        public static List<(string Name, double Score)> FindSimilarLocalSymbols(
+        internal static List<(string Name, double Score)> FindSimilarLocalSymbols(
             string queryName,
             string[] candidateNames)
         {
