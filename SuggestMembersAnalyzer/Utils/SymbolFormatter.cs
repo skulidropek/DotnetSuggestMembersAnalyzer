@@ -153,8 +153,12 @@ namespace SuggestMembersAnalyzer.Utils
 
                 return sb.ToString();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Log detailed error information for SuggestMembersAnalyzer
+                System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] SymbolFormatter.GetMethodSignature failed for method '{method.Name}' in type '{method.ContainingType?.Name}': {ex}");
+
+                // Fallback to simple name if signature generation fails
                 return method.Name + "()";
             }
         }
@@ -206,8 +210,12 @@ namespace SuggestMembersAnalyzer.Utils
                 sb.Append('}');
                 return sb.ToString();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Log detailed error information for SuggestMembersAnalyzer
+                System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] SymbolFormatter.GetPropertySignature failed for property '{property.Name}' in type '{property.ContainingType?.Name}': {ex}");
+
+                // Fallback to simple name if signature generation fails
                 return property.Name;
             }
         }

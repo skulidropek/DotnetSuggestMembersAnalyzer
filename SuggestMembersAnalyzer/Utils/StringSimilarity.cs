@@ -260,8 +260,11 @@ namespace SuggestMembersAnalyzer.Utils
 
                     result.Add((member.Name, displayName, score));
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    // Log detailed error information for SuggestMembersAnalyzer
+                    System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] StringSimilarity.GetFormattedMembersList failed processing member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
+
                     // In case of error, add just the member name
                     double score = ComputeCompositeScore(requestedName, member.Name);
                     result.Add((member.Name, member.Name, score));
@@ -306,8 +309,13 @@ namespace SuggestMembersAnalyzer.Utils
                     .Select(item => (item.Name, item.Item2))
                     .ToList();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Log detailed error information for SuggestMembersAnalyzer
+                System.Diagnostics.Debug.WriteLine($"[SuggestMembersAnalyzer] StringSimilarity.FindPossibleExports failed searching for '{requestedName}' in namespace '{moduleSymbol?.Name ?? "null"}': {ex}");
+
+                // Return empty list if exports retrieval fails
+                // This provides graceful degradation while preserving error information
                 return new List<(string name, double score)>();
             }
         }
