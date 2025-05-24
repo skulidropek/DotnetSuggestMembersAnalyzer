@@ -82,7 +82,7 @@ namespace SuggestMembersAnalyzer.Utils
                 k++;
             }
 
-            return transpositions / 2;
+            return Math.DivRem(transpositions, 2, out _); // Explicit integer division to satisfy SS003
         }
 
         /// <summary>
