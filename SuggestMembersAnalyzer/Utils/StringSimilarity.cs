@@ -52,6 +52,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Composite similarity score.</returns>
         internal static double ComputeCompositeScore(string unknown, string candidate)
         {
+            if (string.IsNullOrEmpty(unknown) || string.IsNullOrEmpty(candidate))
+            {
+                return 0.0;
+            }
+
             string normQuery = Normalize(unknown);
             string normCandidate = Normalize(candidate);
 
@@ -207,6 +212,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Jaro similarity score between 0.0 and 1.0.</returns>
         internal static double Jaro(string s1, string s2)
         {
+            if (s1 is null || s2 is null)
+            {
+                return 0.0;
+            }
+
             if (string.Equals(s1, s2, StringComparison.Ordinal))
             {
                 return 1.0;
@@ -241,6 +251,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Jaro-Winkler similarity score between 0.0 and 1.0.</returns>
         internal static double JaroWinkler(string s1, string s2)
         {
+            if (s1 is null || s2 is null)
+            {
+                return 0.0;
+            }
+
             double jaroSim = Jaro(s1, s2);
 
             int prefix = 0;
@@ -267,7 +282,20 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Normalized string.</returns>
         internal static string Normalize(string str)
         {
-            return NormalizeRegex.Replace(str.ToLowerInvariant(), string.Empty);
+            if (string.IsNullOrEmpty(str))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return NormalizeRegex.Replace(str.ToLowerInvariant(), string.Empty);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Fallback to manual normalization if regex times out
+                return str.ToLowerInvariant().Replace("_", string.Empty).Replace(" ", string.Empty);
+            }
         }
 
         /// <summary>
@@ -277,9 +305,22 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Array of lowercase tokens.</returns>
         internal static string[] SplitIdentifier(string identifier)
         {
-            return [.. SplitRegex.Split(identifier)
-                .Select(static s => s.ToLowerInvariant())
-                .Where(static s => !string.IsNullOrEmpty(s)),];
+            if (string.IsNullOrEmpty(identifier))
+            {
+                return [];
+            }
+
+            try
+            {
+                return [.. SplitRegex.Split(identifier)
+                    .Select(static s => s.ToLowerInvariant())
+                    .Where(static s => !string.IsNullOrEmpty(s)),];
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Fallback to simple splitting if regex times out
+                return [identifier.ToLowerInvariant()];
+            }
         }
     }
 }

@@ -23,6 +23,16 @@ namespace SuggestMembersAnalyzer.Utils
         internal static (string name, string displayName, double score) FormatMember(
             ISymbol member, string requestedName, ITypeSymbol objectType)
         {
+            if (member is null)
+            {
+                return (string.Empty, string.Empty, 0.0);
+            }
+
+            if (string.IsNullOrEmpty(requestedName))
+            {
+                return (member.Name, member.Name, 0.0);
+            }
+
             try
             {
                 string displayName = FormatMemberDisplayName(member);
@@ -34,11 +44,12 @@ namespace SuggestMembersAnalyzer.Utils
                 // Log detailed error information for SuggestMembersAnalyzer
                 System.Diagnostics.Debug.WriteLine(
                     "[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
-                    $"member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
+                    $"member '{member?.Name ?? "null"}' of type '{member?.Kind}' in '{objectType?.Name ?? "null"}': {ex}");
 
                 // In case of error, add just the member name
-                double score = StringSimilarity.ComputeCompositeScore(requestedName, member.Name);
-                return (member.Name, member.Name, score);
+                string memberName = member?.Name ?? "unknown";
+                double score = StringSimilarity.ComputeCompositeScore(requestedName, memberName);
+                return (memberName, memberName, score);
             }
         }
 
@@ -49,13 +60,15 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Formatted display name.</returns>
         private static string FormatMemberDisplayName(ISymbol member)
         {
-            return member switch
-            {
-                IMethodSymbol methodSymbol => FormatMethodDisplayName(methodSymbol),
-                IPropertySymbol propertySymbol => $"{member.Name}: {propertySymbol.Type}",
-                IFieldSymbol fieldSymbol => $"{member.Name}: {fieldSymbol.Type}",
-                _ => member.Name,
-            };
+            return member is null
+                ? string.Empty
+                : member switch
+                {
+                    IMethodSymbol methodSymbol => FormatMethodDisplayName(methodSymbol),
+                    IPropertySymbol propertySymbol => $"{member.Name}: {propertySymbol.Type?.ToString() ?? "object"}",
+                    IFieldSymbol fieldSymbol => $"{member.Name}: {fieldSymbol.Type?.ToString() ?? "object"}",
+                    _ => member.Name,
+                };
         }
 
         /// <summary>
@@ -65,10 +78,16 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Formatted method display name.</returns>
         private static string FormatMethodDisplayName(IMethodSymbol methodSymbol)
         {
-            System.Collections.Generic.List<string> parameters = [.. methodSymbol.Parameters.Select(static p => $"{p.Name}: {p.Type}")];
+            if (methodSymbol is null)
+            {
+                return string.Empty;
+            }
+
+            System.Collections.Generic.List<string> parameters = [.. methodSymbol.Parameters
+                .Select(static p => $"{p.Name ?? "param"}: {p.Type?.ToString() ?? "object"}"),];
 
             string paramString = string.Join(", ", parameters);
-            string returnType = methodSymbol.ReturnType.ToString();
+            string returnType = methodSymbol.ReturnType?.ToString() ?? "void";
 
             string displayName = $"{methodSymbol.Name}({paramString})";
             if (!string.Equals(returnType, "void", StringComparison.Ordinal))

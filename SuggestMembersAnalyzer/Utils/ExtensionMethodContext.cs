@@ -31,10 +31,10 @@ namespace SuggestMembersAnalyzer.Utils
             HashSet<string> seenNames,
             List<(string Name, ISymbol Symbol)> entries)
         {
-            this.receiverType = receiverType;
-            this.compilation = compilation;
-            this.seenNames = seenNames;
-            this.entries = entries;
+            this.receiverType = receiverType ?? throw new System.ArgumentNullException(nameof(receiverType));
+            this.compilation = compilation ?? throw new System.ArgumentNullException(nameof(compilation));
+            this.seenNames = seenNames ?? throw new System.ArgumentNullException(nameof(seenNames));
+            this.entries = entries ?? throw new System.ArgumentNullException(nameof(entries));
         }
 
         /// <summary>
@@ -43,6 +43,11 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="method">The method to try adding.</param>
         internal void TryAdd(IMethodSymbol method)
         {
+            if (method is null)
+            {
+                return;
+            }
+
             IMethodSymbol? candidate = method.MethodKind == MethodKind.ReducedExtension ? method : method.IsExtensionMethod ? BindExtension(method) : null;
 
             if (candidate is null || !seenNames.Add(candidate.Name))
@@ -60,18 +65,23 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>The bound method symbol, or null if binding fails.</returns>
         private IMethodSymbol? BindExtension(IMethodSymbol ext)
         {
+            if (ext is null)
+            {
+                return null;
+            }
+
             IMethodSymbol? reduced = ext.ReduceExtensionMethod(receiverType);
             if (reduced is not null)
             {
                 return reduced;
             }
 
-            if (ext.Parameters.Length == 0x0)
+            if (ext.Parameters.Length == 0)
             {
                 return null;
             }
 
-            ITypeSymbol thisParam = ext.Parameters[0x0].Type;
+            ITypeSymbol thisParam = ext.Parameters[0].Type;
             Conversion conv = compilation.ClassifyConversion(receiverType, thisParam);
             return (conv is { Exists: true, IsExplicit: false }) ? ext : null;
         }

@@ -423,7 +423,8 @@ namespace SuggestMembersAnalyzer.Utils
         private static string FormatType(ITypeSymbol t)
         {
             return t is null
-                ? "object" : t.SpecialType switch
+                ? "object"
+                : t.SpecialType switch
                 {
                     SpecialType.System_Void or SpecialType.System_Boolean or SpecialType.System_Char or
                     SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
@@ -463,6 +464,8 @@ namespace SuggestMembersAnalyzer.Utils
                     SpecialType.System_Runtime_CompilerServices_RuntimeFeature => throw new NotSupportedException(),
                     SpecialType.System_Runtime_CompilerServices_PreserveBaseOverridesAttribute => throw new NotSupportedException(),
                     SpecialType.System_Runtime_CompilerServices_InlineArrayAttribute => throw new NotSupportedException(),
+
+                    // Handle all other special types safely without throwing exceptions
                     _ => t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty),
                 };
         }
