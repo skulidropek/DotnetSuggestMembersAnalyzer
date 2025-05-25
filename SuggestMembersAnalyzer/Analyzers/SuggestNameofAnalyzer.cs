@@ -2,7 +2,7 @@
 // Copyright (c) PlaceholderCompany. All rights reserved.
 // </copyright>
 
-namespace SuggestMembersAnalyzer
+namespace SuggestMembersAnalyzer.Analyzers
 {
     using System;
     using System.Collections.Immutable;
@@ -25,7 +25,7 @@ namespace SuggestMembersAnalyzer
         private const string Category = "Usage";
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
-        private static readonly DiagnosticDescriptor UseNameofRule = new (
+        private static readonly DiagnosticDescriptor UseNameofRule = new(
             UseNameofInsteadOfStringDiagnosticId,
             new LocalizableResourceString(nameof(Resources.UseNameofInsteadOfStringTitle), Resources.ResourceManager, typeof(Resources)),
             new LocalizableResourceString(nameof(Resources.UseNameofInsteadOfStringMessageFormat), Resources.ResourceManager, typeof(Resources)),
@@ -57,7 +57,7 @@ namespace SuggestMembersAnalyzer
         /// <param name="context">Analysis context.</param>
         private static void AnalyzeNameofInvocation(SyntaxNodeAnalysisContext context)
         {
-            var invocation = (InvocationExpressionSyntax)context.Node;
+            InvocationExpressionSyntax invocation = (InvocationExpressionSyntax)context.Node;
 
             // Check if this is a nameof() call
             if (invocation.Expression is not IdentifierNameSyntax identifier ||
@@ -74,13 +74,13 @@ namespace SuggestMembersAnalyzer
             }
 
             // Process all expressions in nameof() arguments
-            foreach (var expression in invocation.ArgumentList.Arguments.Select(arg => arg.Expression))
+            foreach (ExpressionSyntax? expression in invocation.ArgumentList.Arguments.Select(static arg => arg.Expression))
             {
-                var symbolInfo = context.SemanticModel.GetSymbolInfo(expression);
+                SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(expression, cancellationToken: context.CancellationToken);
 
                 // If the argument doesn't resolve to a symbol and there are no candidates,
                 // it's likely an invalid reference
-                if (symbolInfo.Symbol == null &&
+                if (symbolInfo is { Symbol: null } &&
                     !symbolInfo.CandidateSymbols.Any() &&
                     symbolInfo.CandidateReason != CandidateReason.OverloadResolutionFailure)
                 {
@@ -88,7 +88,7 @@ namespace SuggestMembersAnalyzer
                     bool partiallyResolved = false;
                     if (expression is MemberAccessExpressionSyntax memberAccess)
                     {
-                        var leftInfo = context.SemanticModel.GetSymbolInfo(memberAccess.Expression);
+                        SymbolInfo leftInfo = context.SemanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken: context.CancellationToken);
 
                         // If the left part resolves, it might just be that the right part is invalid
                         partiallyResolved = leftInfo.Symbol != null;
@@ -97,9 +97,9 @@ namespace SuggestMembersAnalyzer
                     if (!partiallyResolved)
                     {
                         // Get suggestions for similar symbols
-                        var suggestions = FindSimilarSymbols(context, expression);
+                        string suggestions = FindSimilarSymbols(context, expression);
 
-                        var diagnostic = Diagnostic.Create(
+                        Diagnostic diagnostic = Diagnostic.Create(
                             UseNameofRule,
                             expression.GetLocation(),
                             expression.ToString(),
@@ -120,28 +120,25 @@ namespace SuggestMembersAnalyzer
         private static string FindSimilarSymbols(SyntaxNodeAnalysisContext context, ExpressionSyntax expression)
         {
             // Lookup visible symbols at this location
-            var model = context.SemanticModel;
-            var symbols = model.LookupSymbols(expression.SpanStart)
-                               .Where(s => s.Kind is SymbolKind.Field or SymbolKind.Property
+            SemanticModel model = context.SemanticModel;
+            System.Collections.Generic.List<ISymbol> symbols = [.. model.LookupSymbols(expression.SpanStart)
+                               .Where(static s => s.Kind is SymbolKind.Field or SymbolKind.Property
                                         or SymbolKind.Method or SymbolKind.Local
-                                        or SymbolKind.Parameter)
-                               .ToList();
+                                        or SymbolKind.Parameter),];
 
             // Find the string representation of the expression
             string expressionText = expression.ToString();
 
             // Find similar symbols using string similarity
-            var entries = symbols.Select(s => (Key: s.Name, Value: (object)s));
-            var similar = StringSimilarity.FindSimilarSymbols(expressionText, entries)
-                                         .Where(result => result.Value != null)
-                                         .ToList();
+            System.Collections.Generic.IEnumerable<(string Key, object Value)> entries =
+                symbols.Select(static s => (Key: s.Name, Value: (object)s));
+            System.Collections.Generic.List<(string Name, object Value, double Score)> similar =
+                [.. StringSimilarity.FindSimilarSymbols(expressionText, entries)
+                    .Where(static result => result.Value != null),];
 
-            if (similar.Count == 0)
-            {
-                return " No suggestions available";
-            }
-
-            return "\n- " + string.Join("\n- ", similar.Select(s => SymbolFormatter.FormatAny(s.Value)));
+            return similar.Count == 0
+                ? " No suggestions available"
+                : "\n- " + string.Join("\n- ", similar.Select(static s => SymbolFormatter.FormatAny(s.Value)));
         }
     }
 }

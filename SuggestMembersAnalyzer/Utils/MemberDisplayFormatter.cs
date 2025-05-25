@@ -33,7 +33,7 @@ namespace SuggestMembersAnalyzer.Utils
             {
                 // Log detailed error information for SuggestMembersAnalyzer
                 System.Diagnostics.Debug.WriteLine(
-                    $"[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
+                    "[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
                     $"member '{member.Name}' of type '{member.Kind}' in '{objectType.Name}': {ex}");
 
                 // In case of error, add just the member name
@@ -54,7 +54,7 @@ namespace SuggestMembersAnalyzer.Utils
                 IMethodSymbol methodSymbol => FormatMethodDisplayName(methodSymbol),
                 IPropertySymbol propertySymbol => $"{member.Name}: {propertySymbol.Type}",
                 IFieldSymbol fieldSymbol => $"{member.Name}: {fieldSymbol.Type}",
-                _ => member.Name
+                _ => member.Name,
             };
         }
 
@@ -65,9 +65,7 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>Formatted method display name.</returns>
         private static string FormatMethodDisplayName(IMethodSymbol methodSymbol)
         {
-            var parameters = methodSymbol.Parameters
-                .Select(static p => $"{p.Name}: {p.Type}")
-                .ToList();
+            System.Collections.Generic.List<string> parameters = [.. methodSymbol.Parameters.Select(static p => $"{p.Name}: {p.Type}")];
 
             string paramString = string.Join(", ", parameters);
             string returnType = methodSymbol.ReturnType.ToString();

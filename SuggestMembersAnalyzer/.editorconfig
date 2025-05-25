@@ -1,18 +1,44 @@
-# Apply rules only to C# files
+# Указывает, что это корневой .editorconfig
+root = true
+
+############################################################
+# Общие настройки для всех файлов проекта (при необходимости)
+[*]
+# По желанию: отступы, формат и прочее
+indent_style = space
+indent_size = 4
+charset = utf-8
+
+############################################################
+# Применяем настройки только к C#-файлам
 [*.cs]
 
-# Split long method calls into multiple lines
+# Разбиение аргументов методах
 csharp_wrap_method_invocation_arguments = true
 csharp_wrap_preserve_single_line = false
 csharp_wrap_chained_expression = true
 
-# Force new lines before '{'
+# Переносы перед '{'
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_members_in_object_initializers = true
 csharp_new_line_before_members_in_anonymous_types = true
 
-# Require braces in if/else/while/for
+# Всегда использовать фигурные скобки
 csharp_prefer_braces = true:error
 
-# Force method arguments to be split onto new lines
+# Разбиение аргументов при переносе строки
 csharp_new_line_before_comma = true
+
+# ----------------------------------------------------------
+# Включаем все анализаторы Roslyn (включая SonarLint) как ошибки
+dotnet_analyzer_diagnostic.severity = error
+
+# Явно включаем правило Sonar S109 “Magic numbers should not be used”
+dotnet_diagnostic.S109.severity = error
+
+# Если нужно, можно явно настроить и другие Sonar-правила:
+# dotnet_diagnostic.S1111.severity = warning
+# dotnet_diagnostic.S1120.severity = error
+
+############################################################
+# При необходимости можно добавить секции для других расширений

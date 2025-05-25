@@ -30,7 +30,7 @@
     <!-- Configure rules for analyzer release tracking -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <NoWarn>S1075,CC0105,CC0001</NoWarn>
+    <NoWarn>S1075,CC0105,CC0001,IDE0065,MENA007,MEN007,IDE0058,CC0038,CC0079,CC0088,MA0165,CC0045,RCS1238,SA1000,SA1010,CC0076,S3358,CC0035,SA1514,GU0012,CC0042,SA1101,CC0043,CC0092,CC0073,SA1008</NoWarn>
     
     <!-- Обязательно для правильной работы IntelliSense с автогенерируемыми ресурсами -->
     <CoreCompileDependsOn>PrepareResources;$(CompileDependsOn)</CoreCompileDependsOn>
@@ -93,10 +93,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.7.0" PrivateAssets="all" />
     <PackageReference Include="System.Composition" Version="9.0.5" PrivateAssets="all" />

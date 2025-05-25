@@ -4,7 +4,6 @@
 
 namespace SuggestMembersAnalyzer.Utils
 {
-    using System;
     using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
@@ -14,10 +13,10 @@ namespace SuggestMembersAnalyzer.Utils
     /// </summary>
     internal sealed class ExtensionMethodContext
     {
-        private readonly ITypeSymbol receiverType;
         private readonly Compilation compilation;
-        private readonly HashSet<string> seenNames;
         private readonly List<(string Name, ISymbol Symbol)> entries;
+        private readonly ITypeSymbol receiverType;
+        private readonly HashSet<string> seenNames;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ExtensionMethodContext"/> class.
@@ -44,27 +43,14 @@ namespace SuggestMembersAnalyzer.Utils
         /// <param name="method">The method to try adding.</param>
         internal void TryAdd(IMethodSymbol method)
         {
-            IMethodSymbol? candidate;
+            IMethodSymbol? candidate = method.MethodKind == MethodKind.ReducedExtension ? method : method.IsExtensionMethod ? BindExtension(method) : null;
 
-            if (method.MethodKind == MethodKind.ReducedExtension)
-            {
-                candidate = method;
-            }
-            else if (method.IsExtensionMethod)
-            {
-                candidate = this.BindExtension(method);
-            }
-            else
-            {
-                candidate = null;
-            }
-
-            if (candidate is null || !this.seenNames.Add(candidate.Name))
+            if (candidate is null || !seenNames.Add(candidate.Name))
             {
                 return;
             }
 
-            this.entries.Add((candidate.Name, candidate));
+            entries.Add((candidate.Name, candidate));
         }
 
         /// <summary>
@@ -74,20 +60,20 @@ namespace SuggestMembersAnalyzer.Utils
         /// <returns>The bound method symbol, or null if binding fails.</returns>
         private IMethodSymbol? BindExtension(IMethodSymbol ext)
         {
-            var reduced = ext.ReduceExtensionMethod(this.receiverType);
+            IMethodSymbol? reduced = ext.ReduceExtensionMethod(receiverType);
             if (reduced is not null)
             {
                 return reduced;
             }
 
-            if (ext.Parameters.Length == 0)
+            if (ext.Parameters.Length == 0x0)
             {
                 return null;
             }
 
-            var thisParam = ext.Parameters[0].Type;
-            var conv = this.compilation.ClassifyConversion(this.receiverType, thisParam);
-            return (conv.Exists && !conv.IsExplicit) ? ext : null;
+            ITypeSymbol thisParam = ext.Parameters[0x0].Type;
+            Conversion conv = compilation.ClassifyConversion(receiverType, thisParam);
+            return (conv is { Exists: true, IsExplicit: false }) ? ext : null;
         }
     }
 }

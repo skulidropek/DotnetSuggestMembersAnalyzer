@@ -2,13 +2,12 @@
 // Copyright (c) PlaceholderCompany. All rights reserved.
 // </copyright>
 
-namespace SuggestMembersAnalyzer
+namespace SuggestMembersAnalyzer.Analyzers
 {
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
-    using global::SuggestMembersAnalyzer.Utils;
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -28,7 +27,7 @@ namespace SuggestMembersAnalyzer
         private const string Category = "Usage";
         private const string HelpLinkUri = "https://github.com/skulidropek/DotnetSuggestMembersAnalyzer";
 
-        private static readonly DiagnosticDescriptor NamespaceNotFoundRule = new DiagnosticDescriptor(
+        private static readonly DiagnosticDescriptor NamespaceNotFoundRule = new(
             id: NamespaceNotFoundDiagnosticId,
             title: Resources.NamespaceNotFoundTitle,
             messageFormat: Resources.NamespaceNotFoundMessageFormat,
@@ -39,7 +38,9 @@ namespace SuggestMembersAnalyzer
             helpLinkUri: HelpLinkUri,
             customTags: "AnalyzerReleaseTracking");
 
-        // Cache of all namespaces
+        /// <summary>
+        /// Cache of all namespaces.
+        /// </summary>
         private static ImmutableArray<string> allNamespaces;
 
         /// <inheritdoc />
@@ -60,35 +61,54 @@ namespace SuggestMembersAnalyzer
         /// <param name="context">The syntax node analysis context.</param>
         private static void AnalyzeUsingDirective(SyntaxNodeAnalysisContext context)
         {
-            var usingDirective = (UsingDirectiveSyntax)context.Node;
+            UsingDirectiveSyntax usingDirective = (UsingDirectiveSyntax)context.Node;
             if (usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword)
                 || usingDirective.Alias != null
-                || usingDirective.Name == null)
+                || usingDirective.Name is null)
             {
                 return;
             }
 
-            var namespaceName = usingDirective.Name.ToString();
-            var symbolInfo = context.SemanticModel.GetSymbolInfo(usingDirective.Name);
+            string namespaceName = usingDirective.Name.ToString();
+            SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(usingDirective.Name, cancellationToken: context.CancellationToken);
             if (symbolInfo.Symbol != null)
             {
                 return; // Namespace exists, nothing to do
             }
 
-            var suggestions = GetSimilarNamespaces(context.Compilation, namespaceName);
+            IEnumerable<string> suggestions = GetSimilarNamespaces(context.Compilation, namespaceName);
             if (!suggestions.Any())
             {
                 return;
             }
 
-            var suggestionsText = "\n- " + string.Join("\n- ", suggestions);
-            var diagnostic = Diagnostic.Create(
+            string suggestionsText = "\n- " + string.Join("\n- ", suggestions);
+            Diagnostic diagnostic = Diagnostic.Create(
                 NamespaceNotFoundRule,
                 usingDirective.Name.GetLocation(),
                 namespaceName,
                 suggestionsText);
 
             context.ReportDiagnostic(diagnostic);
+        }
+
+        /// <summary>
+        /// Recursively collects namespace names from a namespace symbol hierarchy.
+        /// </summary>
+        /// <param name="ns">The namespace symbol to start collection from.</param>
+        /// <param name="builder">The builder to add namespace names to.</param>
+        private static void CollectNamespaces(INamespaceSymbol ns, ImmutableArray<string>.Builder builder)
+        {
+            string name = ns.ToDisplayString();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                builder.Add(name);
+            }
+
+            foreach (INamespaceSymbol child in ns.GetNamespaceMembers())
+            {
+                CollectNamespaces(child, builder);
+            }
         }
 
         /// <summary>
@@ -104,10 +124,10 @@ namespace SuggestMembersAnalyzer
                 return allNamespaces;
             }
 
-            var builder = ImmutableArray.CreateBuilder<string>();
+            ImmutableArray<string>.Builder builder = ImmutableArray.CreateBuilder<string>();
             CollectNamespaces(compilation.GlobalNamespace, builder);
 
-            foreach (var reference in compilation.References)
+            foreach (MetadataReference reference in compilation.References)
             {
                 if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)
                 {
@@ -120,25 +140,6 @@ namespace SuggestMembersAnalyzer
         }
 
         /// <summary>
-        /// Recursively collects namespace names from a namespace symbol hierarchy.
-        /// </summary>
-        /// <param name="ns">The namespace symbol to start collection from.</param>
-        /// <param name="builder">The builder to add namespace names to.</param>
-        private static void CollectNamespaces(INamespaceSymbol ns, ImmutableArray<string>.Builder builder)
-        {
-            var name = ns.ToDisplayString();
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                builder.Add(name);
-            }
-
-            foreach (var child in ns.GetNamespaceMembers())
-            {
-                CollectNamespaces(child, builder);
-            }
-        }
-
-        /// <summary>
         /// Finds namespaces with names similar to the requested namespace name.
         /// </summary>
         /// <param name="compilation">The compilation containing potential namespace matches.</param>
@@ -146,10 +147,10 @@ namespace SuggestMembersAnalyzer
         /// <returns>A collection of similar namespace names.</returns>
         private static IEnumerable<string> GetSimilarNamespaces(Compilation compilation, string namespaceName)
         {
-            var allNs = GetAllNamespaces(compilation);
+            ImmutableArray<string> allNs = GetAllNamespaces(compilation);
             return Utils.StringSimilarity
-                        .FindSimilarSymbols(namespaceName, allNs.Select(ns => (Key: ns, Value: ns)).ToList())
-                        .Select(r => r.Value);
+                        .FindSimilarSymbols(namespaceName, allNs.Select(static ns => (Key: ns, Value: ns)).ToList())
+                        .Select(static r => r.Value);
         }
     }
 }

@@ -2,7 +2,7 @@
 // Copyright (c) PlaceholderCompany. All rights reserved.
 // </copyright>
 
-namespace SuggestMembersAnalyzer
+namespace SuggestMembersAnalyzer.Analyzers
 {
     using System;
     using System.Collections.Generic;
@@ -31,17 +31,17 @@ namespace SuggestMembersAnalyzer
             Resources.ResourceManager,
             typeof(Resources));
 
-        private static readonly LocalizableString MessageFormat = new LocalizableResourceString(
-            nameof(Resources.NamedArgumentNotFoundMessageFormat),
-            Resources.ResourceManager,
-            typeof(Resources));
-
         private static readonly LocalizableString Description = new LocalizableResourceString(
             nameof(Resources.NamedArgumentNotFoundDescription),
             Resources.ResourceManager,
             typeof(Resources));
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
+        private static readonly LocalizableString MessageFormat = new LocalizableResourceString(
+            nameof(Resources.NamedArgumentNotFoundMessageFormat),
+            Resources.ResourceManager,
+            typeof(Resources));
+
+        private static readonly DiagnosticDescriptor Rule = new(
             DiagnosticId,
             Title,
             MessageFormat,
@@ -75,16 +75,16 @@ namespace SuggestMembersAnalyzer
         /// <param name="context">The syntax node analysis context containing the node to analyze.</param>
         private static void AnalyzeArgument(SyntaxNodeAnalysisContext context)
         {
-            var arg = (ArgumentSyntax)context.Node;
+            ArgumentSyntax arg = (ArgumentSyntax)context.Node;
 
             // Early validation for named arguments only
-            if (!TryGetNamedArgumentInfo(arg, out string providedName, out ArgumentListSyntax? argumentList) || argumentList == null)
+            if (!TryGetNamedArgumentInfo(arg, out string providedName, out ArgumentListSyntax? argumentList) || argumentList is null)
             {
                 return;
             }
 
             // Get candidate methods and member type
-            var (candidateMethods, memberType) = GetCandidateMethods(argumentList, context.SemanticModel);
+            (IReadOnlyList<IMethodSymbol> candidateMethods, string memberType) = GetCandidateMethods(argumentList, context.SemanticModel);
             if (candidateMethods.Count == 0)
             {
                 return;
@@ -97,33 +97,58 @@ namespace SuggestMembersAnalyzer
             }
 
             // Build suggestions and report diagnostic
-            var invokedName = GetInvokedName(candidateMethods[0]);
-            var suggestionsText = BuildMethodSignatures(candidateMethods);
+            string invokedName = GetInvokedName(candidateMethods[0]);
+            string suggestionsText = BuildMethodSignatures(candidateMethods);
 
             ReportNamedArgumentDiagnostic(context, arg, memberType, providedName, invokedName, suggestionsText);
         }
 
         /// <summary>
-        /// Validates if the argument is a named argument and extracts relevant information.
+        /// Builds formatted method signatures for diagnostic suggestions.
         /// </summary>
-        /// <param name="arg">The argument syntax to validate.</param>
-        /// <param name="providedName">The provided parameter name.</param>
-        /// <param name="argumentList">The containing argument list.</param>
-        /// <returns>True if this is a named argument that should be analyzed.</returns>
-        private static bool TryGetNamedArgumentInfo(ArgumentSyntax arg, out string providedName, out ArgumentListSyntax? argumentList)
+        /// <param name="candidateMethods">The candidate methods to format.</param>
+        /// <returns>Formatted suggestions text with method signatures.</returns>
+        private static string BuildMethodSignatures(IReadOnlyList<IMethodSymbol> candidateMethods)
         {
-            providedName = string.Empty;
-            argumentList = null;
+            List<string> signatures = [.. candidateMethods.Select(FormatMethodSignature)];
+            return "\n- " + string.Join("\n- ", signatures);
+        }
 
-            if (arg.NameColon == null)
+        /// <summary>
+        /// Extracts method symbols from symbol info, handling both resolved and candidate symbols.
+        /// </summary>
+        /// <param name="info">The symbol info to extract methods from.</param>
+        /// <returns>Collection of method symbols.</returns>
+        private static IMethodSymbol[] ExtractMethodSymbols(SymbolInfo info)
+        {
+            return info.CandidateReason == CandidateReason.OverloadResolutionFailure
+                ? [.. info.CandidateSymbols.OfType<IMethodSymbol>()]
+                : info.Symbol is IMethodSymbol singleMethod ? [singleMethod] : [];
+        }
+
+        /// <summary>
+        /// Formats a single method signature for display.
+        /// </summary>
+        /// <param name="method">The method to format.</param>
+        /// <returns>Formatted method signature.</returns>
+        private static string FormatMethodSignature(IMethodSymbol method)
+        {
+            string paramList = string.Join(
+                ", ",
+                method.Parameters.Select(static p =>
+                    $"{p.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)} {p.Name}"));
+
+            if (method.MethodKind == MethodKind.Constructor)
             {
-                return false; // only named arguments
+                return $"{method.ContainingType.Name}({paramList})";
             }
 
-            providedName = arg.NameColon.Name.Identifier.Text;
-            argumentList = arg.Parent as ArgumentListSyntax;
+            // Handle generic methods
+            string genericArgs = method is { IsGenericMethod: true } && method.TypeParameters.Length > 0
+                ? $"<{string.Join(", ", method.TypeParameters.Select(static tp => tp.Name))}>"
+                : string.Empty;
 
-            return argumentList != null;
+            return $"{method.Name}{genericArgs}({paramList})";
         }
 
         /// <summary>
@@ -138,56 +163,20 @@ namespace SuggestMembersAnalyzer
             // 1) invocation: foo(bar: 1)
             if (argumentList.Parent is InvocationExpressionSyntax inv)
             {
-                var info = semanticModel.GetSymbolInfo(inv.Expression);
-                var methods = ExtractMethodSymbols(info);
+                SymbolInfo info = semanticModel.GetSymbolInfo(inv.Expression);
+                IMethodSymbol[] methods = ExtractMethodSymbols(info);
                 return (methods, "Method");
             }
 
             // 2) object creation: new Ctor(name: "x")
             if (argumentList.Parent is ObjectCreationExpressionSyntax oc)
             {
-                var info = semanticModel.GetSymbolInfo(oc);
-                var methods = ExtractMethodSymbols(info);
+                SymbolInfo info = semanticModel.GetSymbolInfo(oc);
+                IMethodSymbol[] methods = ExtractMethodSymbols(info);
                 return (methods, "Constructor");
             }
 
             return (Array.Empty<IMethodSymbol>(), string.Empty);
-        }
-
-        /// <summary>
-        /// Extracts method symbols from symbol info, handling both resolved and candidate symbols.
-        /// </summary>
-        /// <param name="info">The symbol info to extract methods from.</param>
-        /// <returns>Collection of method symbols.</returns>
-        private static IReadOnlyList<IMethodSymbol> ExtractMethodSymbols(SymbolInfo info)
-        {
-            if (info.CandidateReason == CandidateReason.OverloadResolutionFailure)
-            {
-                return info.CandidateSymbols.OfType<IMethodSymbol>().ToList();
-            }
-
-            if (info.Symbol is IMethodSymbol singleMethod)
-            {
-                return new[] { singleMethod };
-            }
-
-            return Array.Empty<IMethodSymbol>();
-        }
-
-        /// <summary>
-        /// Checks if the provided parameter name exists in any of the candidate methods.
-        /// </summary>
-        /// <param name="candidateMethods">The candidate methods to check.</param>
-        /// <param name="providedName">The provided parameter name.</param>
-        /// <returns>True if the parameter name exists in any method.</returns>
-        private static bool IsValidParameterName(IReadOnlyList<IMethodSymbol> candidateMethods, string providedName)
-        {
-            var allParams = candidateMethods
-                .SelectMany(m => m.Parameters.Select(p => p.Name))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            return allParams.Contains(providedName, StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -203,39 +192,18 @@ namespace SuggestMembersAnalyzer
         }
 
         /// <summary>
-        /// Builds formatted method signatures for diagnostic suggestions.
+        /// Checks if the provided parameter name exists in any of the candidate methods.
         /// </summary>
-        /// <param name="candidateMethods">The candidate methods to format.</param>
-        /// <returns>Formatted suggestions text with method signatures.</returns>
-        private static string BuildMethodSignatures(IReadOnlyList<IMethodSymbol> candidateMethods)
+        /// <param name="candidateMethods">The candidate methods to check.</param>
+        /// <param name="providedName">The provided parameter name.</param>
+        /// <returns>True if the parameter name exists in any method.</returns>
+        private static bool IsValidParameterName(IReadOnlyList<IMethodSymbol> candidateMethods, string providedName)
         {
-            var signatures = candidateMethods.Select(FormatMethodSignature).ToList();
-            return "\n- " + string.Join("\n- ", signatures);
-        }
+            List<string> allParams = [.. candidateMethods
+                .SelectMany(static m => m.Parameters.Select(static p => p.Name))
+                .Distinct(StringComparer.Ordinal),];
 
-        /// <summary>
-        /// Formats a single method signature for display.
-        /// </summary>
-        /// <param name="method">The method to format.</param>
-        /// <returns>Formatted method signature.</returns>
-        private static string FormatMethodSignature(IMethodSymbol method)
-        {
-            string paramList = string.Join(
-                ", ",
-                method.Parameters.Select(p =>
-                    $"{p.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)} {p.Name}"));
-
-            if (method.MethodKind == MethodKind.Constructor)
-            {
-                return $"{method.ContainingType.Name}({paramList})";
-            }
-
-            // Handle generic methods
-            string genericArgs = method.IsGenericMethod && method.TypeParameters.Length > 0
-                ? $"<{string.Join(", ", method.TypeParameters.Select(tp => tp.Name))}>"
-                : string.Empty;
-
-            return $"{method.Name}{genericArgs}({paramList})";
+            return allParams.Contains(providedName, StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -255,7 +223,7 @@ namespace SuggestMembersAnalyzer
             string invokedName,
             string suggestionsText)
         {
-            var diagnostic = Diagnostic.Create(
+            Diagnostic diagnostic = Diagnostic.Create(
                 Rule,
                 arg.NameColon?.Name.GetLocation() ?? arg.GetLocation(),
                 memberType,          // element type (Method or Constructor)
@@ -264,6 +232,34 @@ namespace SuggestMembersAnalyzer
                 suggestionsText);    // available signatures
 
             context.ReportDiagnostic(diagnostic);
+        }
+
+        /// <summary>
+        /// Validates if the argument is a named argument and extracts relevant information.
+        /// </summary>
+        /// <param name="arg">The argument syntax to validate.</param>
+        /// <param name="providedName">The provided parameter name.</param>
+        /// <param name="argumentList">The containing argument list.</param>
+        /// <returns>True if this is a named argument that should be analyzed.</returns>
+        private static bool TryGetNamedArgumentInfo(ArgumentSyntax arg, out string providedName, out ArgumentListSyntax? argumentList)
+        {
+            providedName = string.Empty;
+            argumentList = null;
+
+            if (arg.NameColon is null)
+            {
+                return false; // only named arguments
+            }
+
+            providedName = arg.NameColon.Name.Identifier.Text;
+
+            if (arg.Parent is ArgumentListSyntax argList)
+            {
+                argumentList = argList;
+                return true;
+            }
+
+            return false;
         }
     }
 }
