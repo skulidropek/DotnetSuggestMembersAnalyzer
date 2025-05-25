@@ -38,11 +38,6 @@ namespace SuggestMembersAnalyzer.Analyzers
             helpLinkUri: HelpLinkUri,
             customTags: "AnalyzerReleaseTracking");
 
-        /// <summary>
-        /// Cache of all namespaces.
-        /// </summary>
-        private static ImmutableArray<string> allNamespaces;
-
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(NamespaceNotFoundRule);
@@ -52,14 +47,30 @@ namespace SuggestMembersAnalyzer.Analyzers
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(AnalyzeUsingDirective, SyntaxKind.UsingDirective);
+            context.RegisterCompilationStartAction(OnCompilationStart);
+        }
+
+        /// <summary>
+        /// Called at the start of compilation to register per-compilation actions.
+        /// </summary>
+        /// <param name="context">The compilation start analysis context.</param>
+        private static void OnCompilationStart(CompilationStartAnalysisContext context)
+        {
+            // Collect all namespaces once per compilation
+            ImmutableArray<string> allNamespaces = GetAllNamespaces(context.Compilation);
+
+            // Register the syntax node action with the collected namespaces
+            context.RegisterSyntaxNodeAction(
+                syntaxContext => AnalyzeUsingDirective(syntaxContext, allNamespaces),
+                SyntaxKind.UsingDirective);
         }
 
         /// <summary>
         /// Analyzes a using directive to check if the namespace exists and suggest alternatives if it doesn't.
         /// </summary>
         /// <param name="context">The syntax node analysis context.</param>
-        private static void AnalyzeUsingDirective(SyntaxNodeAnalysisContext context)
+        /// <param name="allNamespaces">Pre-collected namespaces for this compilation.</param>
+        private static void AnalyzeUsingDirective(SyntaxNodeAnalysisContext context, ImmutableArray<string> allNamespaces)
         {
             UsingDirectiveSyntax usingDirective = (UsingDirectiveSyntax)context.Node;
             if (usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword)
@@ -76,7 +87,7 @@ namespace SuggestMembersAnalyzer.Analyzers
                 return; // Namespace exists, nothing to do
             }
 
-            IEnumerable<string> suggestions = GetSimilarNamespaces(context.Compilation, namespaceName);
+            IEnumerable<string> suggestions = GetSimilarNamespaces(allNamespaces, namespaceName);
             if (!suggestions.Any())
             {
                 return;
@@ -113,17 +124,12 @@ namespace SuggestMembersAnalyzer.Analyzers
 
         /// <summary>
         /// Gets all available namespaces from the compilation and its referenced assemblies.
-        /// Uses a static cache to avoid repeated collection.
+        /// This method is called once per compilation to avoid stale cache issues.
         /// </summary>
         /// <param name="compilation">The compilation containing the namespaces.</param>
         /// <returns>An immutable array of namespace names.</returns>
         private static ImmutableArray<string> GetAllNamespaces(Compilation compilation)
         {
-            if (!allNamespaces.IsDefaultOrEmpty)
-            {
-                return allNamespaces;
-            }
-
             ImmutableArray<string>.Builder builder = ImmutableArray.CreateBuilder<string>();
             CollectNamespaces(compilation.GlobalNamespace, builder);
 
@@ -135,21 +141,19 @@ namespace SuggestMembersAnalyzer.Analyzers
                 }
             }
 
-            allNamespaces = builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
-            return allNamespaces;
+            return builder.Distinct(StringComparer.Ordinal).ToImmutableArray();
         }
 
         /// <summary>
         /// Finds namespaces with names similar to the requested namespace name.
         /// </summary>
-        /// <param name="compilation">The compilation containing potential namespace matches.</param>
+        /// <param name="allNamespaces">Pre-collected namespaces for this compilation.</param>
         /// <param name="namespaceName">The namespace name to find alternatives for.</param>
         /// <returns>A collection of similar namespace names.</returns>
-        private static IEnumerable<string> GetSimilarNamespaces(Compilation compilation, string namespaceName)
+        private static IEnumerable<string> GetSimilarNamespaces(ImmutableArray<string> allNamespaces, string namespaceName)
         {
-            ImmutableArray<string> allNs = GetAllNamespaces(compilation);
             return Utils.StringSimilarity
-                        .FindSimilarSymbols(namespaceName, allNs.Select(static ns => (Key: ns, Value: ns)).ToList())
+                        .FindSimilarSymbols(namespaceName, allNamespaces.Select(static ns => (Key: ns, Value: ns)).ToList())
                         .Select(static r => r.Value);
         }
     }
