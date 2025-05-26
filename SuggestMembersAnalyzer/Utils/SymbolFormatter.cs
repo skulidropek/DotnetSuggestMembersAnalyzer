@@ -68,8 +68,10 @@ namespace SuggestMembersAnalyzer.Utils
                     IFieldSymbol f => FormatField(f),
                     ILocalSymbol l => $"[Local]     {FormatType(l.Type)} {l.Name}",
                     IParameterSymbol p => $"[Parameter] {FormatType(p.Type)} {p.Name}",
+                    IEventSymbol e => FormatEvent(e),
                     INamedTypeSymbol t when IsAttributeType(t) => FormatAttributeType(t),
-                    INamedTypeSymbol t => $"[Class]     {t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty)}",
+                    INamedTypeSymbol t => FormatNamedType(t),
+                    INamespaceSymbol ns => $"[Namespace] {ns.ToDisplayString()}",
                     _ => symbol.ToDisplayString(),
                 };
         }
@@ -85,12 +87,15 @@ namespace SuggestMembersAnalyzer.Utils
                 : entry switch
                 {
                     INamedTypeSymbol t when IsAttributeType(t) => "Attribute",
+                    INamedTypeSymbol t => GetNamedTypeKind(t),
                     IMethodSymbol m when IsAttributeCtor(m) => "Attribute",
                     IMethodSymbol => "Method",
                     IPropertySymbol => "Property",
                     IFieldSymbol => "Field",
                     ILocalSymbol => "Local",
                     IParameterSymbol => "Parameter",
+                    IEventSymbol => "Event",
+                    INamespaceSymbol => "Namespace",
                     string s when s.EndsWith(AttributeSuffix, StringComparison.Ordinal) => "Attribute",
                     string => "Class",
                     _ => "Identifier",
@@ -169,10 +174,7 @@ namespace SuggestMembersAnalyzer.Utils
             }
             catch (Exception ex)
             {
-                // Log detailed error information for SuggestMembersAnalyzer
-                Console.WriteLine(
-                    "[SuggestMembersAnalyzer] SymbolFormatter.GetMethodSignature failed for method " +
-                    $"'{method.Name}' in type '{method.ContainingType?.Name}': {ex}");
+                Console.WriteLine($"[SymbolFormatter.GetMethodSignature] Error formatting method signature: {ex}");
 
                 // Fallback to simple name if signature generation fails
                 return $"{method.Name}()";
@@ -235,10 +237,7 @@ namespace SuggestMembersAnalyzer.Utils
             }
             catch (Exception ex)
             {
-                // Log detailed error information for SuggestMembersAnalyzer
-                Console.WriteLine(
-                    "[SuggestMembersAnalyzer] SymbolFormatter.GetPropertySignature failed for property " +
-                    $"'{property.Name}' in type '{property.ContainingType?.Name}': {ex}");
+                Console.WriteLine($"[SymbolFormatter.GetPropertySignature] Error formatting property signature: {ex}");
 
                 // Fallback to simple name if signature generation fails
                 return property.Name;
@@ -476,6 +475,42 @@ namespace SuggestMembersAnalyzer.Utils
             }
 
             return null;
+        }
+
+        private static string GetNamedTypeKind(INamedTypeSymbol t)
+        {
+            return t.TypeKind switch
+            {
+                TypeKind.Class => "Class",
+                TypeKind.Interface => "Interface",
+                TypeKind.Struct => "Struct",
+                TypeKind.Enum => "Enum",
+                TypeKind.Delegate => "Delegate",
+                TypeKind.Dynamic => "Dynamic",
+                TypeKind.TypeParameter => "TypeParameter",
+                TypeKind.Array => "Array",
+                TypeKind.Error => "Error",
+                TypeKind.Module => "Module",
+                TypeKind.Pointer => "Pointer",
+                TypeKind.Unknown => "Unknown",
+                TypeKind.Submission => "Submission",
+                TypeKind.FunctionPointer => "FunctionPointer",
+                _ => "Class",
+            };
+        }
+
+        private static string FormatNamedType(INamedTypeSymbol t)
+        {
+            string kind = GetNamedTypeKind(t);
+            string name = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty);
+            return $"[{kind}]     {name}";
+        }
+
+        private static string FormatEvent(IEventSymbol e)
+        {
+            string typ = FormatType(e.Type);
+            string own = e.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty);
+            return $"[Event]     {typ} {own}.{e.Name}";
         }
     }
 }

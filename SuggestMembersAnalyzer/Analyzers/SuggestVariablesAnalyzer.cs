@@ -90,47 +90,64 @@ namespace SuggestMembersAnalyzer.Analyzers
                 // Collect type names for this compilation
                 ImmutableArray<string> typeNames = CollectAllTypeNames(compilation);
 
+                // Register for both IdentifierName and GenericName to handle all cases
                 compilationContext.RegisterSyntaxNodeAction(
-                    nodeCtx => AnalyzeIdentifier(nodeCtx, typeNames),
-                    SyntaxKind.IdentifierName);
+                    nodeCtx => AnalyzeNameSyntax(nodeCtx, typeNames, compilation),
+                    SyntaxKind.IdentifierName,
+                    SyntaxKind.GenericName);
             });
         }
 
         // ───────────────────────────────────────────────────────────── Core analysis
 
         /// <summary>
-        /// Analyse each <see cref="IdentifierNameSyntax"/> that failed binding and emit SMB002 suggestions.
+        /// Analyzes both IdentifierNameSyntax and GenericNameSyntax for unresolved symbols.
         /// </summary>
         /// <param name="context">Analysis context.</param>
         /// <param name="allTypeNames">Collection of all available type names.</param>
-        private static void AnalyzeIdentifier(
+        /// <param name="compilation">The compilation context.</param>
+        private static void AnalyzeNameSyntax(
             SyntaxNodeAnalysisContext context,
-            ImmutableArray<string> allTypeNames)
+            ImmutableArray<string> allTypeNames,
+            Compilation compilation)
         {
-            if (context.Node is not IdentifierNameSyntax id)
+            // Extract identifier and name from both IdentifierNameSyntax and GenericNameSyntax
+            string name;
+            SyntaxToken identifier;
+
+            switch (context.Node)
+            {
+                case IdentifierNameSyntax idName:
+                    name = idName.Identifier.ValueText;
+                    identifier = idName.Identifier;
+                    break;
+
+                case GenericNameSyntax genericName:
+                    name = genericName.Identifier.ValueText;
+                    identifier = genericName.Identifier;
+                    break;
+
+                default:
+                    return; // Shouldn't happen with our registration
+            }
+
+            // Quick filters and validation - works for both types
+            if (ShouldSkipNameSyntax(context.Node, name, context.SemanticModel))
             {
                 return;
             }
 
-            string name = id.Identifier.ValueText;
-
-            // Quick filters and validation
-            if (ShouldSkipIdentifier(id, name, context.SemanticModel))
+            // Check if we should analyze this syntax
+            if (!ShouldAnalyzeForSuggestions(context.Node, name, context.SemanticModel))
             {
                 return;
             }
 
-            // Check if we should analyze this identifier
-            if (!ShouldAnalyzeForSuggestions(id, name, context.SemanticModel))
-            {
-                return;
-            }
-
-            // Generate and report suggestions
-            List<object> suggestions = GatherSymbolSuggestions(id, name, context.SemanticModel, allTypeNames);
+            // Generate and report suggestions using the location of the identifier
+            List<object> suggestions = GatherSymbolSuggestions(context.Node, name, context.SemanticModel, allTypeNames, compilation);
             if (suggestions.Count > 0)
             {
-                ReportSuggestionDiagnostic(context, id, name, suggestions);
+                ReportSuggestionDiagnostic(context, identifier.GetLocation(), name, suggestions);
             }
         }
 
@@ -182,34 +199,35 @@ namespace SuggestMembersAnalyzer.Analyzers
         /// <summary>
         /// Gathers symbol suggestions for an identifier.
         /// </summary>
-        /// <param name="id">The identifier syntax.</param>
+        /// <param name="node">The syntax node (IdentifierNameSyntax or GenericNameSyntax).</param>
         /// <param name="name">The identifier name.</param>
         /// <param name="model">The semantic model.</param>
         /// <param name="allTypeNames">All available type names.</param>
+        /// <param name="compilation">The compilation context.</param>
         /// <returns>List of suggested symbols.</returns>
+        /// <exception cref="ArgumentException">Thrown when the node type is not supported.</exception>
         private static List<object> GatherSymbolSuggestions(
-            IdentifierNameSyntax id,
+            SyntaxNode node,
             string name,
             SemanticModel model,
-            ImmutableArray<string> allTypeNames)
+            ImmutableArray<string> allTypeNames,
+            Compilation compilation)
         {
-            // Gather locals/fields/props + project type names
-            IEnumerable<(string Key, object Value)> visibleSymbols = model.LookupSymbols(id.SpanStart)
-                                      .Where(static s => s.Kind is SymbolKind.Local or SymbolKind.Parameter or
-                                                  SymbolKind.Field or SymbolKind.Property or SymbolKind.Method)
-                                      .Select(static s => (Key: s.Name, Value: (object)s));
-
-            IEnumerable<(string Key, object Value)> typeEntries = allTypeNames.Select(static full =>
+            // Convert to IdentifierNameSyntax for the existing logic
+            IdentifierNameSyntax idSyntax = node switch
             {
-                int last = full.LastIndexOf('.') + 1;
-                string shortName = last > 0 ? full.Substring(last) : full;
-                return (Key: shortName, Value: (object)full);
-            });
+                IdentifierNameSyntax id => id,
+                GenericNameSyntax generic => SyntaxFactory.IdentifierName(generic.Identifier),
+                _ => throw new ArgumentException($"Unsupported node type: {node.GetType()}", nameof(node)),
+            };
 
-            return [.. StringSimilarity
-                .FindSimilarSymbols(name, visibleSymbols.Concat(typeEntries))
-                .Select(static r => r.Value)
-                .Where(static v => v != null),];
+            // Use the new contextual symbol suggester for intelligent prioritization
+            return ContextualSymbolSuggester.GatherPrioritizedSuggestions(
+                idSyntax,
+                name,
+                model,
+                allTypeNames,
+                compilation);
         }
 
         private static bool HasRelevantCompilerError(SemanticModel model, SyntaxNode id)
@@ -260,18 +278,18 @@ namespace SuggestMembersAnalyzer.Analyzers
                 nameofExpr.Identifier.ValueText.Equals("nameof", StringComparison.Ordinal);
         }
 
-        /// <summary>Checks whether <paramref name="id"/> is exactly in a type-usage position.</summary>
-        /// <param name="id">Identifier syntax to check.</param>
-        /// <returns>True if identifier is in type position.</returns>
-        private static bool IsTypePosition(IdentifierNameSyntax id)
+        /// <summary>Checks whether <paramref name="node"/> is exactly in a type-usage position.</summary>
+        /// <param name="node">Syntax node to check.</param>
+        /// <returns>True if node is in type position.</returns>
+        private static bool IsTypePosition(SyntaxNode node)
         {
-            return id.Parent switch
+            return node?.Parent switch
             {
                 TypeSyntax => true,
                 ObjectCreationExpressionSyntax => true,
-                ParameterSyntax { Type: var t } => t == id,
-                VariableDeclarationSyntax { Type: var t } => t == id,
-                CastExpressionSyntax { Type: var t } => t == id,
+                ParameterSyntax { Type: var t } => t == node,
+                VariableDeclarationSyntax { Type: var t } => t == node,
+                CastExpressionSyntax { Type: var t } => t == node,
                 _ => false,
             };
         }
@@ -280,12 +298,12 @@ namespace SuggestMembersAnalyzer.Analyzers
         /// Reports a suggestion diagnostic for an identifier.
         /// </summary>
         /// <param name="context">The analysis context.</param>
-        /// <param name="id">The identifier syntax.</param>
+        /// <param name="location">The location to report the diagnostic at.</param>
         /// <param name="name">The identifier name.</param>
         /// <param name="suggestions">The list of suggestions.</param>
         private static void ReportSuggestionDiagnostic(
             SyntaxNodeAnalysisContext context,
-            IdentifierNameSyntax id,
+            Location location,
             string name,
             List<object> suggestions)
         {
@@ -294,7 +312,7 @@ namespace SuggestMembersAnalyzer.Analyzers
 
             Diagnostic diagnostic = Diagnostic.Create(
                 Rule,
-                id.GetLocation(),
+                location,
                 entityKind,
                 name,
                 suggestionText);
@@ -305,47 +323,50 @@ namespace SuggestMembersAnalyzer.Analyzers
         /// <summary>
         /// Determines if an identifier should be analyzed for suggestions.
         /// </summary>
-        /// <param name="id">The identifier syntax.</param>
+        /// <param name="node">The syntax node.</param>
         /// <param name="name">The identifier name.</param>
         /// <param name="model">The semantic model.</param>
         /// <returns>True if the identifier should be analyzed.</returns>
-        private static bool ShouldAnalyzeForSuggestions(IdentifierNameSyntax id, string name, SemanticModel model)
+        private static bool ShouldAnalyzeForSuggestions(SyntaxNode node, string name, SemanticModel model)
         {
             // Check compiler diagnostics for «name/type not found»
-            if (HasRelevantCompilerError(model, id) || IsTypePosition(id))
+            bool hasCompilerError = HasRelevantCompilerError(model, node);
+            bool isTypePos = IsTypePosition(node);
+
+            if (hasCompilerError || isTypePos)
             {
                 return true;
             }
 
             // Extra heuristic: ignore if identifier clearly unrelated to a known type
-            return model.LookupSymbols(id.SpanStart)
+            return model.LookupSymbols(node.SpanStart)
                      .OfType<INamedTypeSymbol>()
                      .Any(sym => StringSimilarity.ComputeCompositeScore(name, sym.Name) > MinimumTypeSimilarityThreshold);
         }
 
         /// <summary>
-        /// Determines if an identifier should be skipped from analysis.
+        /// Determines if a syntax node should be skipped from analysis.
         /// </summary>
-        /// <param name="id">The identifier syntax.</param>
+        /// <param name="node">The syntax node.</param>
         /// <param name="name">The identifier name.</param>
         /// <param name="model">The semantic model.</param>
-        /// <returns>True if the identifier should be skipped.</returns>
-        private static bool ShouldSkipIdentifier(IdentifierNameSyntax id, string name, SemanticModel model)
+        /// <returns>True if the node should be skipped.</returns>
+        private static bool ShouldSkipNameSyntax(SyntaxNode node, string name, SemanticModel model)
         {
             // Quick filters — cheap checks first
             if (Keywords.Contains(name) ||
-                id.Parent is NameColonSyntax || // named arguments
-                id.Parent is VariableDeclaratorSyntax || // declarations
-                id.Parent is MemberBindingExpressionSyntax || // ?.M
-                (id.Parent is MemberAccessExpressionSyntax { Name: var n } && n == id) ||
-                id.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
-                IsInXmlComment(id) ||
-                IsNameOfOperand(id))
+                node.Parent is NameColonSyntax || // named arguments
+                node.Parent is VariableDeclaratorSyntax || // declarations
+                node.Parent is MemberBindingExpressionSyntax || // ?.M
+                (node.Parent is MemberAccessExpressionSyntax { Name: var n } && n == node) ||
+                node.Ancestors().OfType<UsingDirectiveSyntax>().Any() ||
+                IsInXmlComment(node) ||
+                (node is IdentifierNameSyntax idName && IsNameOfOperand(idName)))
             {
                 return true;
             }
 
-            SymbolInfo info = model.GetSymbolInfo(id);
+            SymbolInfo info = model.GetSymbolInfo(node);
 
             // Already resolved or only overload mismatch – nothing to do
             if (info.Symbol is not null ||
@@ -355,7 +376,7 @@ namespace SuggestMembersAnalyzer.Analyzers
             }
 
             // Skip LINQ clauses / anonymous initializers
-            return id.Ancestors().Any(static a => a is QueryExpressionSyntax or AnonymousObjectMemberDeclaratorSyntax);
+            return node.Ancestors().Any(static a => a is QueryExpressionSyntax or AnonymousObjectMemberDeclaratorSyntax);
         }
     }
 }

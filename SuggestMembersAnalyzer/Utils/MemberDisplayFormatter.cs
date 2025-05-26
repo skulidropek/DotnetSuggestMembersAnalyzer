@@ -18,10 +18,9 @@ namespace SuggestMembersAnalyzer.Utils
         /// </summary>
         /// <param name="member">The member symbol to format.</param>
         /// <param name="requestedName">The requested name for similarity scoring.</param>
-        /// <param name="objectType">The containing type for error context.</param>
         /// <returns>Tuple of member name, display name, and similarity score.</returns>
         internal static (string name, string displayName, double score) FormatMember(
-            ISymbol member, string requestedName, ITypeSymbol objectType)
+            ISymbol member, string requestedName)
         {
             if (member is null)
             {
@@ -41,10 +40,7 @@ namespace SuggestMembersAnalyzer.Utils
             }
             catch (Exception ex)
             {
-                // Log detailed error information for SuggestMembersAnalyzer
-                Console.WriteLine(
-                    "[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
-                    $"member '{member?.Name ?? "null"}' of type '{member?.Kind}' in '{objectType?.Name ?? "null"}': {ex}");
+                Console.WriteLine($"[MemberDisplayFormatter.FormatMember] Error formatting member: {ex}");
 
                 // In case of error, add just the member name
                 string memberName = member?.Name ?? "unknown";

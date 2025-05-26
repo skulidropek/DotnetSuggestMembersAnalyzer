@@ -122,6 +122,7 @@ namespace SuggestMembersAnalyzer.Utils
 
             try
             {
+                // Get all exports from the module symbol
                 IEnumerable<INamespaceOrTypeSymbol> exports = moduleSymbol.GetMembers();
 
                 // Calculate similarity scores, filter by threshold, sort by score and return top 5
@@ -134,10 +135,7 @@ namespace SuggestMembersAnalyzer.Utils
             }
             catch (Exception ex)
             {
-                // Log detailed error information for SuggestMembersAnalyzer
-                Console.WriteLine(
-                    "[SuggestMembersAnalyzer] StringSimilarity.FindPossibleExports failed searching for " +
-                    $"'{requestedName}' in namespace '{moduleSymbol?.Name ?? "null"}': {ex}");
+                Console.WriteLine($"[StringSimilarity.FindPossibleExports] Error retrieving exports: {ex}");
 
                 // Return empty list if exports retrieval fails
                 // This provides graceful degradation while preserving error information
@@ -197,7 +195,7 @@ namespace SuggestMembersAnalyzer.Utils
         internal static List<string> GetFormattedMembersList(ITypeSymbol objectType, string requestedName)
         {
             return [.. objectType.GetMembers()
-                .Select(member => MemberDisplayFormatter.FormatMember(member, requestedName, objectType))
+                .Select(member => MemberDisplayFormatter.FormatMember(member, requestedName))
                 .Where(static item => item.score >= MinimumSimilarityScore)
                 .OrderByDescending(static item => item.score)
                 .Take(MaxResultCount)
@@ -291,8 +289,10 @@ namespace SuggestMembersAnalyzer.Utils
             {
                 return NormalizeRegex.Replace(str.ToLowerInvariant(), string.Empty);
             }
-            catch (RegexMatchTimeoutException)
+            catch (RegexMatchTimeoutException ex)
             {
+                Console.WriteLine($"[StringSimilarity.Normalize] Regex timeout: {ex}");
+
                 // Fallback to manual normalization if regex times out
                 return str.ToLowerInvariant().Replace("_", string.Empty).Replace(" ", string.Empty);
             }
@@ -316,9 +316,9 @@ namespace SuggestMembersAnalyzer.Utils
                     .Select(static s => s.ToLowerInvariant())
                     .Where(static s => !string.IsNullOrEmpty(s)),];
             }
-            catch (RegexMatchTimeoutException)
+            catch (RegexMatchTimeoutException ex)
             {
-                // Fallback to simple splitting if regex times out
+                Console.WriteLine($"[StringSimilarity.SplitIdentifier] Regex timeout: {ex}");
                 return [identifier.ToLowerInvariant()];
             }
         }
