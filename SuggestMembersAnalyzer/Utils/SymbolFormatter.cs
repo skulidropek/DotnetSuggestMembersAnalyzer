@@ -170,7 +170,7 @@ namespace SuggestMembersAnalyzer.Utils
             catch (Exception ex)
             {
                 // Log detailed error information for SuggestMembersAnalyzer
-                System.Diagnostics.Debug.WriteLine(
+                Console.WriteLine(
                     "[SuggestMembersAnalyzer] SymbolFormatter.GetMethodSignature failed for method " +
                     $"'{method.Name}' in type '{method.ContainingType?.Name}': {ex}");
 
@@ -236,7 +236,7 @@ namespace SuggestMembersAnalyzer.Utils
             catch (Exception ex)
             {
                 // Log detailed error information for SuggestMembersAnalyzer
-                System.Diagnostics.Debug.WriteLine(
+                Console.WriteLine(
                     "[SuggestMembersAnalyzer] SymbolFormatter.GetPropertySignature failed for property " +
                     $"'{property.Name}' in type '{property.ContainingType?.Name}': {ex}");
 
@@ -422,52 +422,7 @@ namespace SuggestMembersAnalyzer.Utils
 
         private static string FormatType(ITypeSymbol t)
         {
-            return t is null
-                ? "object"
-                : t.SpecialType switch
-                {
-                    SpecialType.System_Void or SpecialType.System_Boolean or SpecialType.System_Char or
-                    SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or
-                    SpecialType.System_UInt16 or SpecialType.System_Int32 or SpecialType.System_UInt32 or
-                    SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Decimal or
-                    SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_String or
-                    SpecialType.System_Object
-                        => t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    SpecialType.None => throw new NotSupportedException(),
-                    SpecialType.System_Enum => throw new NotSupportedException(),
-                    SpecialType.System_MulticastDelegate => throw new NotSupportedException(),
-                    SpecialType.System_Delegate => throw new NotSupportedException(),
-                    SpecialType.System_ValueType => throw new NotSupportedException(),
-                    SpecialType.System_IntPtr => throw new NotSupportedException(),
-                    SpecialType.System_UIntPtr => throw new NotSupportedException(),
-                    SpecialType.System_Array => throw new NotSupportedException(),
-                    SpecialType.System_Collections_IEnumerable => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_IEnumerable_T => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_IList_T => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_ICollection_T => throw new NotSupportedException(),
-                    SpecialType.System_Collections_IEnumerator => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_IEnumerator_T => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_IReadOnlyList_T => throw new NotSupportedException(),
-                    SpecialType.System_Collections_Generic_IReadOnlyCollection_T => throw new NotSupportedException(),
-                    SpecialType.System_Nullable_T => throw new NotSupportedException(),
-                    SpecialType.System_DateTime => throw new NotSupportedException(),
-                    SpecialType.System_Runtime_CompilerServices_IsVolatile => throw new NotSupportedException(),
-                    SpecialType.System_IDisposable => throw new NotSupportedException(),
-                    SpecialType.System_TypedReference => throw new NotSupportedException(),
-                    SpecialType.System_ArgIterator => throw new NotSupportedException(),
-                    SpecialType.System_RuntimeArgumentHandle => throw new NotSupportedException(),
-                    SpecialType.System_RuntimeFieldHandle => throw new NotSupportedException(),
-                    SpecialType.System_RuntimeMethodHandle => throw new NotSupportedException(),
-                    SpecialType.System_RuntimeTypeHandle => throw new NotSupportedException(),
-                    SpecialType.System_IAsyncResult => throw new NotSupportedException(),
-                    SpecialType.System_AsyncCallback => throw new NotSupportedException(),
-                    SpecialType.System_Runtime_CompilerServices_RuntimeFeature => throw new NotSupportedException(),
-                    SpecialType.System_Runtime_CompilerServices_PreserveBaseOverridesAttribute => throw new NotSupportedException(),
-                    SpecialType.System_Runtime_CompilerServices_InlineArrayAttribute => throw new NotSupportedException(),
-
-                    // Handle all other special types safely without throwing exceptions
-                    _ => t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty),
-                };
+            return t is null ? "object" : t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         }
 
         private static string GetFieldSignature(IFieldSymbol f)

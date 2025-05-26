@@ -42,7 +42,7 @@ namespace SuggestMembersAnalyzer.Utils
             catch (Exception ex)
             {
                 // Log detailed error information for SuggestMembersAnalyzer
-                System.Diagnostics.Debug.WriteLine(
+                Console.WriteLine(
                     "[SuggestMembersAnalyzer] MemberDisplayFormatter.FormatMember failed processing " +
                     $"member '{member?.Name ?? "null"}' of type '{member?.Kind}' in '{objectType?.Name ?? "null"}': {ex}");
 

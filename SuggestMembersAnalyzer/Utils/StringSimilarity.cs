@@ -135,7 +135,7 @@ namespace SuggestMembersAnalyzer.Utils
             catch (Exception ex)
             {
                 // Log detailed error information for SuggestMembersAnalyzer
-                System.Diagnostics.Debug.WriteLine(
+                Console.WriteLine(
                     "[SuggestMembersAnalyzer] StringSimilarity.FindPossibleExports failed searching for " +
                     $"'{requestedName}' in namespace '{moduleSymbol?.Name ?? "null"}': {ex}");
 
